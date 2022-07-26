@@ -33,12 +33,14 @@ def get_teeth_ROI(detected_results, save=False):
     }
 
     images = {}
+    split_teeth = {}
     for i in range(len(detected_results)):
         file_name = detected_results.files[i][:-4]
         bounds = detected_results.xyxy[i]
         img = detected_results.imgs[i]
 
         images[file_name] = []
+        split_teeth[file_name] = {}
         for flag in ('upper', 'lower'):
             teeth_dict = {}
             flag_list = flag_dict[flag]
@@ -49,6 +51,7 @@ def get_teeth_ROI(detected_results, save=False):
                 cls = int(cls.item())
                 name = detected_results.names[cls]
                 teeth_dict[name] = xyxy
+                split_teeth[file_name][name] = {'xyxy': xyxy, 'rotation_offset': [0, 0]}
 
             teeth_detected_flag = [f in teeth_dict for f in flag_list]
 
@@ -81,7 +84,7 @@ def get_teeth_ROI(detected_results, save=False):
 
                 images[file_name].append(image_data)
 
-    return images
+    return {'images': images, 'split_teeth': split_teeth}
 
     # matplotlib.use('module://backend_interagg')
     #

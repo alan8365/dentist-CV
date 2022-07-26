@@ -1,4 +1,5 @@
 import cv2 as cv
+import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import torchvision.transforms as transforms
@@ -389,7 +390,7 @@ def tooth_isolation(source, flag='upper', tooth_position='left', file_name=None,
     for i in range(bounding_number):
         x1 = valleys[i]
         x2 = valleys[i + 1]
-        xyxy = [x1, y1, x2, y2]
+        xyxy = torch.Tensor([x1, y1, x2, y2])
 
         try:
             tooth_number = tooth_number_dict[i]
