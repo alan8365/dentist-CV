@@ -1,10 +1,45 @@
 import os
 import json
 
-import pandas as pd
 import torch
+import numpy as np
+import pandas as pd
 
 from glob import glob
+from math import sin, cos
+
+
+def xyxy_reformat(x):
+    # Convert nx4 boxes to xy1=top-left, xy2=bottom-right
+    # y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y = np.copy(x)
+    y[:, 0] = x[:, [0, 2]].min(axis=1)  # right point x
+    y[:, 1] = x[:, [1, 3]].min(axis=1)  # top point y
+    y[:, 2] = x[:, [0, 2]].max(axis=1)  # left point x
+    y[:, 3] = x[:, [1, 3]].max(axis=1)  # bottom point y
+    return y
+
+
+def xyxy2xywh(x):
+    # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h] where xy1=top-left, xy2=bottom-right
+    # y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y = np.copy(x)
+    y[:, 0] = (x[:, 0] + x[:, 2]) / 2  # x center
+    y[:, 1] = (x[:, 1] + x[:, 3]) / 2  # y center
+    y[:, 2] = x[:, 2] - x[:, 0]  # width
+    y[:, 3] = x[:, 3] - x[:, 1]  # height
+    return y
+
+
+def xywh2xyxy(x):
+    # Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
+    # y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y = np.copy(x)
+    y[:, 0] = x[:, 0] - x[:, 2] / 2  # top left x
+    y[:, 1] = x[:, 1] - x[:, 3] / 2  # top left y
+    y[:, 2] = x[:, 0] + x[:, 2] / 2  # bottom right x
+    y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
+    return y
 
 
 def rect_include_another(box1, box2, eps=1e-9):
@@ -67,8 +102,8 @@ def get_image_by_labels(target_labels, file_name='label_TF.csv'):
     return df[result_mask]
 
 
-def get_labels_by_image(file_path, target_labels=None):
-    with open(file_path, 'r', encoding='utf-8') as f:
+def get_labels_by_image(filepath, target_labels=None):
+    with open(filepath, 'r', encoding='utf-8') as f:
         data = json.load(f)
         shapes = data['shapes']
 
@@ -111,6 +146,64 @@ def get_classification_format(teeth_region, target_labels, dataset_dir=None):
                     result.append({f'{json_filename}-{key}': label})
 
 
+def recovery_rotated_bounding(theta, org_image_shape, bounding_boxes):
+    rot_matrix = np.copy([[cos(theta), -sin(theta)], [sin(theta), cos(theta)]])
+    in_center, out_center = get_rotation_center(org_image_shape, rot_matrix)
+    offset = in_center - out_center
+
+    # Compute rotation
+    xywh_rot_matrix = np.array([[cos(theta), -sin(theta), 0, 0],
+                                [sin(theta), cos(theta), 0, 0],
+                                [0, 0, cos(theta), sin(abs(theta))],
+                                [0, 0, sin(abs(theta)), cos(theta)], ])
+    bounding_boxes_rotated = np.array(bounding_boxes)
+    bounding_boxes_rotated = xyxy2xywh(bounding_boxes_rotated)
+    bounding_boxes_rotated = bounding_boxes_rotated.transpose()
+
+    bounding_boxes_rotated = xywh_rot_matrix @ bounding_boxes_rotated
+
+    margin = np.array([offset[0], offset[1], 0, 0])
+    bounding_boxes_rotated = bounding_boxes_rotated + margin[:, None]
+    print(bounding_boxes_rotated)
+    bounding_boxes_rotated = xywh2xyxy(bounding_boxes_rotated.transpose()).astype(int)
+
+    return bounding_boxes_rotated
+
+
+def get_rotation_center(org_image_shape, rot_matrix):
+    in_plane_shape = np.array(org_image_shape)
+    # Compute transformed input bounds
+    iy, ix = in_plane_shape
+    out_bounds = rot_matrix @ [[0, 0, iy, iy],
+                               [0, ix, 0, ix]]
+    # Compute the shape of the transformed input plane
+    out_plane_shape = (out_bounds.ptp(axis=1) + 0.5).astype(int)
+    out_center = rot_matrix @ ((out_plane_shape - 1) / 2)
+    in_center = (in_plane_shape - 1) / 2
+    return in_center, out_center
+
+
+def rotate_bounding_boxes(theta, org_image_shape, bounding_boxes):
+    rot_matrix = np.copy([[cos(theta), -sin(theta)], [sin(theta), cos(theta)]])
+    in_center, out_center = get_rotation_center(org_image_shape, rot_matrix)
+    offset = out_center - in_center
+    offset = np.tile(offset, 2)
+
+    rot_matrix = np.copy([[cos(-theta), -sin(-theta)], [sin(-theta), cos(-theta)]])
+    bounding_boxes_rotated = np.array(bounding_boxes)
+    boxes_shape = bounding_boxes_rotated.shape
+
+    bounding_boxes_rotated = bounding_boxes_rotated + np.tile(offset, boxes_shape[0])
+    bounding_boxes_rotated = bounding_boxes_rotated.reshape((boxes_shape[0], 2, 2), order='F')
+    bounding_boxes_rotated = (rot_matrix @ bounding_boxes_rotated).reshape((boxes_shape[0], 4), order='F')
+
+    return bounding_boxes_rotated
+
+
 # TODO classified by tooth number
 if __name__ == '__main__':
-    pass
+    phi = 0.3490658503988659
+    shape = [326, 443]
+    xyxy = [[144.91, 34.606, 276.73, 136.12]]
+
+    xyxy = rotate_bounding_boxes(phi, shape, xyxy)

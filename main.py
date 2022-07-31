@@ -15,6 +15,7 @@ if __name__ == '__main__':
     # Image
     images = glob('../Datasets/phase-2/*.jpg')
 
-    results = model(images[:3])
+    results = model(images[:2])
 
-    teeth_region = bounding_teeth_on_origin(results)
+    matplotlib.use('module://backend_interagg')
+    teeth_region = bounding_teeth_on_origin(results, rotation_fix=False)

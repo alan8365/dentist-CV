@@ -6,18 +6,19 @@ from glob import glob
 import matplotlib
 import matplotlib.pyplot as plt
 from pathlib import Path
+import numpy as np
 
 
 def crop_by_two_tooth(left, right, margin=50):
     x_items = [left[2], right[0]]
     y_items = [left[1], left[3], right[1], right[3]]
 
-    crop = [
+    crop = np.array([
         min(x_items) - margin,
         min(y_items),
         max(x_items) + margin,
         max(y_items) + margin,
-    ]
+    ])
 
     return crop
 
@@ -51,7 +52,7 @@ def get_teeth_ROI(detected_results, save=False):
                 cls = int(cls.item())
                 name = detected_results.names[cls]
                 teeth_dict[name] = xyxy
-                split_teeth[file_name][name] = {'xyxy': xyxy, 'rotation_offset': [0, 0]}
+                split_teeth[file_name][name] = {'xyxy': xyxy}
 
             teeth_detected_flag = [f in teeth_dict for f in flag_list]
 
@@ -66,7 +67,7 @@ def get_teeth_ROI(detected_results, save=False):
                 left_tooth = teeth_dict[left_tooth_number]
                 right_tooth = teeth_dict[right_tooth_number]
 
-                region = crop_by_two_tooth(left_tooth, right_tooth)
+                region = crop_by_two_tooth(left_tooth, right_tooth).astype(int)
 
                 save_filename = f'{flag}-{number}-{file_name}'
                 save_file = Path(f'./crops/{save_filename}.jpg')
@@ -78,7 +79,7 @@ def get_teeth_ROI(detected_results, save=False):
                     'flag': flag,
                     'number': number,
                     'org_file_name': file_name,
-                    'offset': [region[0], region[1]],
+                    'offset': np.array([region[0], region[1]]),
                     'image': im,
                 }
 
@@ -100,7 +101,7 @@ def get_teeth_ROI(detected_results, save=False):
 if __name__ == "__main__":
     model = torch.hub.load('.', 'custom', path=r'.\weights\8-bound.pt', source='local')
     # Image
-    imgs = glob('../../Datasets/二階段全/*8117*.jpg')
+    imgs = glob('../../Datasets/phase-2/*.jpg')
     # Inference
     results = model(imgs[:10])
 

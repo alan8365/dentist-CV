@@ -11,7 +11,9 @@ from PIL import Image, ImageOps
 from scipy import ndimage
 from pathlib import Path
 
-from yolov5.utils.plots import save_one_box
+from yolov5.utils.plots import save_one_box, Annotator
+from preprocess.util import recovery_rotated_bounding
+from YOLO.util import get_teeth_ROI
 
 all_tooth_number_dict = {
     'upper': {
@@ -344,20 +346,21 @@ def vertical_separation(source, flag='upper', tooth_type='molar'):
     return window_position, valleys, ver, ver_slope
 
 
-def tooth_isolation(source, flag='upper', tooth_position='left', file_name=None, save=False):
+def tooth_isolation(source, flag='upper', tooth_position='left', filename=None, save=False, rotation_fix=False):
     # Find jaw separation line and gums separation
     # FIXME jaw_spe_line in lower missing
-    crop_images = {}
+    crop_regions = {}
     gum_sep_line, jaw_sep_line, theta, hor_valleys, hor = gum_jaw_separation(source, flag=flag)
+    source_rotated = source.copy()
     if tooth_position == 'middle':
         theta = 0
     else:
-        source = ndimage.rotate(source, theta, reshape=True, cval=255)
+        source_rotated = ndimage.rotate(source, theta, reshape=True, cval=255)
 
     if flag == 'upper':
-        source_roi = source[gum_sep_line:jaw_sep_line, :]
+        source_roi = source_rotated[gum_sep_line:jaw_sep_line, :]
     elif flag == 'lower':
-        source_roi = source[jaw_sep_line:gum_sep_line, :]
+        source_roi = source_rotated[jaw_sep_line:gum_sep_line, :]
     else:
         raise ValueError(f'flag only accept upper or lower but get {flag}.')
 
@@ -370,10 +373,10 @@ def tooth_isolation(source, flag='upper', tooth_position='left', file_name=None,
     tooth_number_dict = all_tooth_number_dict[flag][tooth_position]
     if tooth_position == 'middle':
         if bounding_number < 4:
-            return crop_images
+            return crop_regions
     elif tooth_position == 'left' or tooth_position == 'right':
         if bounding_number < 3:
-            return crop_images
+            return crop_regions
     else:
         raise ValueError(f'tooth_region only accept left, middle or right but get {tooth_position}.')
 
@@ -386,11 +389,13 @@ def tooth_isolation(source, flag='upper', tooth_position='left', file_name=None,
         raise ValueError(f'flag only accept upper or lower but get {flag}.')
 
     unknown_counter = 50
-    source_rgb = cv.cvtColor(source, cv.COLOR_GRAY2RGB)
+    source_rgb = cv.cvtColor(source_rotated, cv.COLOR_GRAY2RGB)
+    bounding_boxes = []
+    tooth_numbers = []
     for i in range(bounding_number):
         x1 = valleys[i]
         x2 = valleys[i + 1]
-        xyxy = torch.Tensor([x1, y1, x2, y2])
+        xyxy = np.array([x1, y1, x2, y2])
 
         try:
             tooth_number = tooth_number_dict[i]
@@ -399,20 +404,86 @@ def tooth_isolation(source, flag='upper', tooth_position='left', file_name=None,
             unknown_counter += 1
 
         if save:
-            save_file = Path(f'./crops/{file_name}-{tooth_number}.jpg')
+            save_file = Path(f'./crops/{filename}/{filename}-{tooth_number}.jpg')
             im = save_one_box(xyxy, source_rgb, save=True, file=save_file)
-            print(f'Tooth crop saved: {file_name}:{tooth_number}')
+            print(f'Tooth crop saved: {filename}:{tooth_number}')
 
         # TODO Rotation offset fix
+        bounding_boxes.append(xyxy)
+        tooth_numbers.append(tooth_number)
+
+    bounding_boxes = np.vstack(bounding_boxes)
+    if rotation_fix:
         theta = math.radians(theta)
-        y1_offset = np.tan(theta) * x1
-        y2_offset = np.tan(theta) * x2
+        shape_h, shape_w = source.shape
+        rotated_xyxy = recovery_rotated_bounding(theta, (shape_w, shape_h), bounding_boxes)
+        bounding_boxes = rotated_xyxy
 
-        region = {tooth_number: {'xyxy': xyxy, 'rotation_offset': [y1_offset, y2_offset]}}
+    for i in range(len(bounding_boxes)):
+        region = {tooth_numbers[i]: {'xyxy': bounding_boxes[i]}}
+        crop_regions.update(region)
 
-        crop_images.update(region)
+    return {'crop_regions': crop_regions, 'angle': theta}
 
-    return crop_images
+
+def bounding_teeth_on_origin(results, save=False, rotation_fix=False):
+    teeth_roi = get_teeth_ROI(results)
+
+    split_teeth = teeth_roi['split_teeth']
+    teeth_roi = teeth_roi['images']
+
+    tooth_position_dict = {
+        0: 'left',
+        1: 'middle',
+        2: 'right'
+    }
+
+    teeth_region = {}
+    for file_name, data in teeth_roi.items():
+        temp_region = {}
+        for datum in data:
+            flag = datum['flag']
+            number = datum['number']
+            im = datum['image']
+            offset = datum['offset']
+
+            tooth_position = tooth_position_dict[number]
+            im_g = cv.cvtColor(im, cv.COLOR_RGB2GRAY)
+
+            isolation_data = tooth_isolation(im_g, flag=flag, filename=file_name, tooth_position=tooth_position,
+                                             save=save,
+                                             rotation_fix=rotation_fix)
+            region = isolation_data['crop_regions']
+            for k, v in region.items():
+                xyxy = region[k]['xyxy']
+
+                xyxy[0] += offset[0]
+                xyxy[1] += offset[1]
+                xyxy[2] += offset[0]
+                xyxy[3] += offset[1]
+
+                region[k]['xyxy'] = xyxy
+
+            temp_region.update(region)
+            temp_region.update(split_teeth[file_name])
+
+            teeth_region[file_name] = temp_region
+
+    # Display bounding area
+    for file_name, data in teeth_region.items():
+        im0 = cv.imread(f'../Datasets/phase-2/{file_name}.jpg')
+        annotator = Annotator(im0, line_width=3, example=file_name)
+        for tooth_number, body in data.items():
+            xyxy = body['xyxy']
+            annotator.box_label(xyxy, str(tooth_number), color=(255, 0, 0))
+
+        im1 = annotator.result()
+
+        plt.imshow(im1)
+        plt.title(file_name)
+        plt.show()
+
+    return teeth_region
 
 
 if __name__ == '__main__':
