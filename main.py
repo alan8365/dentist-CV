@@ -4,9 +4,8 @@ from glob import glob
 from matplotlib import pyplot as plt
 import matplotlib
 
-from YOLO.util import get_teeth_ROI
-from edge.util import tooth_isolation
-from util import bounding_teeth_on_origin
+from utils.yolo import get_teeth_ROI
+from utils.edge import tooth_isolation, bounding_teeth_on_origin
 
 from yolov5.utils.plots import Annotator, colors
 

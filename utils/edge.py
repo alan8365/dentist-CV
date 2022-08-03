@@ -6,14 +6,13 @@ import torchvision.transforms as transforms
 import numpy as np
 import math
 
-from glob import glob
 from PIL import Image, ImageOps
 from scipy import ndimage
 from pathlib import Path
 
 from yolov5.utils.plots import save_one_box, Annotator
-from preprocess.util import recovery_rotated_bounding
-from YOLO.util import get_teeth_ROI
+from utils.preprocess import recovery_rotated_bounding
+from utils.yolo import get_teeth_ROI
 
 all_tooth_number_dict = {
     'upper': {
@@ -144,26 +143,34 @@ def window_avg(source, window_size=5):
     return result
 
 
-def get_slope(source, window_size=5):
-    result = np.zeros(source.shape, dtype='int32')
-    step = window_size // 2
-    length = len(source)
+# def get_slope(source, window_size=5):
+#     result = np.zeros(source.shape, dtype='int32')
+#     step = window_size // 2
+#     length = len(source)
+#
+#     for i in range(length):
+#         if i < step:
+#             pass
+#         elif i > length - step - 1:
+#             pass
+#         else:
+#             slope = (source[i + step] - source[i - step]) / window_size
+#             result[i] = slope
+#
+#     return result
 
-    for i in range(length):
-        if i < step:
-            pass
-        elif i > length - step - 1:
-            pass
-        else:
-            slope = (source[i + step] - source[i - step]) / window_size
-            result[i] = slope
+
+def get_slope(source):
+    x = np.array(range(source.shape[0]))
+
+    result = np.gradient(source, x)
 
     return result
 
 
 # FIXME molar size change process
 # FIXME valley cross the tooth
-def get_valley_window(slope, integral, source=None, window_size_0=50, left_margin_0=50):
+def get_valley_window(slope, integral, window_size_0=50, left_margin_0=50):
     length = slope.shape[0]
     negative_slope_index = np.where(slope < 0)[0]
     positive_slope_index = np.where(slope > 0)[0]
@@ -271,15 +278,19 @@ def gum_jaw_separation(source, flag='upper'):
     _, _, hor_valleys = get_valley_window(hor_slope, hor, window_size_0=50, left_margin_0=30)
 
     jaw_sep_line = hor_valleys[hor[hor_valleys].argmin()]
-    if flag == 'upper':
-        # FIXME IndexError: index -1 is out of bounds for axis 0 with size 0
-        gum_sep_line = hor_valleys[hor_valleys < jaw_sep_line - 30][-1]
-        gum_sep_line -= margin
-    elif flag == 'lower':
-        gum_sep_line = hor_valleys[hor_valleys > jaw_sep_line + 30][0]
-        gum_sep_line += margin
-    else:
-        raise ValueError(f'flag only accept upper or lower but get {flag}.')
+    try:
+        if flag == 'upper':
+            # FIXME IndexError: index -1 is out of bounds for axis 0 with size 0
+            gum_sep_line = hor_valleys[hor_valleys < jaw_sep_line - 30][-1]
+            gum_sep_line -= margin
+        elif flag == 'lower':
+            gum_sep_line = hor_valleys[hor_valleys > jaw_sep_line + 30][0]
+            gum_sep_line += margin
+        else:
+            raise ValueError(f'flag only accept upper or lower but get {flag}.')
+    except IndexError:
+        # didn't get gum_sep_line in hor_valleys
+        gum_sep_line = jaw_sep_line - 100 - margin if flag == 'upper' else jaw_sep_line + 100 + margin
 
     return gum_sep_line, jaw_sep_line, theta, hor_valleys, hor
 
@@ -408,7 +419,6 @@ def tooth_isolation(source, flag='upper', tooth_position='left', filename=None, 
             im = save_one_box(xyxy, source_rgb, save=True, file=save_file)
             print(f'Tooth crop saved: {filename}:{tooth_number}')
 
-        # TODO Rotation offset fix
         bounding_boxes.append(xyxy)
         tooth_numbers.append(tooth_number)
 

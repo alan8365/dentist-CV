@@ -57,7 +57,7 @@ def get_teeth_ROI(detected_results, save=False):
             teeth_detected_flag = [f in teeth_dict for f in flag_list]
 
             if sum(teeth_detected_flag) < 2:
-                print(file_name + ':' + str(teeth_dict.keys()))
+                # print(file_name + ':' + str(teeth_dict.keys()))
                 continue
 
             tooth_detected_tuples = [(flag_list[j], flag_list[j + 1], j) for j in range(len(flag_list) - 1) if

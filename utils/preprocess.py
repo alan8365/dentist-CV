@@ -42,10 +42,13 @@ def xywh2xyxy(x):
     return y
 
 
-def rect_include_another(box1, box2, eps=1e-9):
+def rect_include_another(box_out, box_in, eps=1e-9):
     # Get the coordinates of bounding boxes
-    b1_x1, b1_y1, b1_x2, b1_y2 = box1[0], box1[1], box1[2], box1[3]
-    b2_x1, b2_y1, b2_x2, b2_y2 = box2[0], box2[1], box2[2], box2[3]
+    box_in = torch.Tensor(box_in)
+    box_out = torch.Tensor(box_out)
+
+    b1_x1, b1_y1, b1_x2, b1_y2 = box_out[0], box_out[1], box_out[2], box_out[3]
+    b2_x1, b2_y1, b2_x2, b2_y2 = box_in[0], box_in[1], box_in[2], box_in[3]
 
     # Intersection area
     inter = (torch.min(b1_x2, b2_x2) - torch.max(b1_x1, b2_x1)).clamp(0) * \
