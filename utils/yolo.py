@@ -10,15 +10,17 @@ import numpy as np
 
 
 def crop_by_two_tooth(left, right, margin=50):
-    x_items = [left[2], right[0]]
-    y_items = [left[1], left[3], right[1], right[3]]
+    # y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    x_items = torch.Tensor([left[2], right[0]])
+    y_items = torch.Tensor([left[1], left[3], right[1], right[3]])
 
-    crop = np.array([
-        min(x_items) - margin,
-        min(y_items),
-        max(x_items) + margin,
-        max(y_items) + margin,
+    crop = torch.Tensor([
+        torch.min(x_items) - margin,
+        torch.min(y_items),
+        torch.max(x_items) + margin,
+        torch.max(y_items) + margin,
     ])
+    crop = crop.int()
 
     return crop
 
@@ -67,7 +69,7 @@ def get_teeth_ROI(detected_results, save=False):
                 left_tooth = teeth_dict[left_tooth_number]
                 right_tooth = teeth_dict[right_tooth_number]
 
-                region = crop_by_two_tooth(left_tooth, right_tooth).astype(int)
+                region = crop_by_two_tooth(left_tooth, right_tooth)
 
                 save_filename = f'{flag}-{number}-{file_name}'
                 save_file = Path(f'./crops/{save_filename}.jpg')

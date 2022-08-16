@@ -1,3 +1,7 @@
 .idea
 *.jpg
 *.pt
+
+.env
+
+test.py

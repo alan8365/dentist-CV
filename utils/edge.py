@@ -406,7 +406,7 @@ def tooth_isolation(source, flag='upper', tooth_position='left', filename=None, 
     for i in range(bounding_number):
         x1 = valleys[i]
         x2 = valleys[i + 1]
-        xyxy = np.array([x1, y1, x2, y2])
+        xyxy = torch.Tensor([x1, y1, x2, y2])
 
         try:
             tooth_number = tooth_number_dict[i]
@@ -417,7 +417,7 @@ def tooth_isolation(source, flag='upper', tooth_position='left', filename=None, 
         if save:
             save_file = Path(f'./crops/{filename}/{filename}-{tooth_number}.jpg')
             im = save_one_box(xyxy, source_rgb, save=True, file=save_file)
-            print(f'Tooth crop saved: {filename}:{tooth_number}')
+            # print(f'Tooth crop saved: {filename}:{tooth_number}')
 
         bounding_boxes.append(xyxy)
         tooth_numbers.append(tooth_number)
