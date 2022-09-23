@@ -6,19 +6,19 @@
 
 import os
 
-import torch
-from glob import glob
 from scipy import ndimage
 import math
 import json
+import torch
 import numpy as np
 
 import cv2
-from matplotlib import pyplot as plt
 import matplotlib
 
+from matplotlib import pyplot as plt
+
+from tqdm import tqdm
 from pathlib import Path
-from math import sin, cos
 from dotenv import load_dotenv
 
 from utils.yolo import get_teeth_ROI
@@ -34,6 +34,8 @@ load_dotenv()
 
 target_labels = ['caries', 'endo', 'post', 'crown']
 image_labels_df = get_image_by_labels(target_labels)[target_labels]
+
+image_labels_df
 
 # In[3]:
 
@@ -61,17 +63,28 @@ results = model(filepath_image)
 teeth_roi = get_teeth_ROI(results)
 teeth_roi_images = teeth_roi['images'][filename]
 teeth_roi_split_teeth = teeth_roi['split_teeth']
+teeth_roi_images
+
+# In[5]:
+
+
+teeth_roi = get_teeth_ROI(results)
+teeth_roi_images = teeth_roi['images'][filename]
+teeth_roi_split_teeth = teeth_roi['split_teeth']
+teeth_roi_images
+
+#
 
 # # One file check
 
-# In[5]:
+# In[6]:
 
 
 image_labels = {}
 labels = get_labels_by_image(filepath_json, target_labels)
 for target_roi in teeth_roi_images:
-    target_roi_image = target_roi['image']
     flag = target_roi['flag']
+    target_roi_image = target_roi['image']
     tooth_position = tooth_position_dict[target_roi['number']]
     im_g = cv2.cvtColor(target_roi_image, cv2.COLOR_RGBA2GRAY)
     im_g_shape = np.array(np.array(im_g.shape)[[1, 0]])
@@ -103,22 +116,24 @@ for target_roi in teeth_roi_images:
                     image_labels[key] = []
                 image_labels[key].append(label['label'])
 
-# In[6]:
+image_labels
+# {'00008026-11': ['post', 'endo', 'crown'],
+#  '00008026-21': ['post', 'endo', 'crown'],
+#  '00008026-12': ['crown'],
+#  '00008026-22': ['crown'],
+#  '00008026-26': ['crown'],
+#  '00008026-46': ['caries'],
+#  '00008026-32': ['crown'],
+#  '00008026-36': ['crown', 'post', 'endo']}
+
+# In[7]:
 
 
 image_labels = {}
-for filename in image_labels_df.index:
-    print(filename)
-    filepath_image = data_dir / f'{filename}.jpg'
-    filepath_json = data_dir / f'{filename}.json'
 
-    results = model(filepath_image)
 
-    teeth_roi = get_teeth_ROI(results)
-    teeth_roi_images = teeth_roi['images'][filename]
-    teeth_roi_split_teeth = teeth_roi['split_teeth']
-
-    labels = get_labels_by_image(filepath_json, target_labels)
+def method_name():
+    global target_roi, target_roi_image, flag, tooth_position, im_g, im_g_shape, isolation_data, regions, theta, offset, phi, label, xyxy, tooth_number, region, tooth_xyxy, key
     for target_roi in teeth_roi_images:
         target_roi_image = target_roi['image']
         flag = target_roi['flag']
@@ -152,3 +167,44 @@ for filename in image_labels_df.index:
                     if not key in image_labels.keys():
                         image_labels[key] = []
                     image_labels[key].append(label['label'])
+
+
+for filename in tqdm(image_labels_df.index):
+    filepath_image = data_dir / f'{filename}.jpg'
+    filepath_json = data_dir / f'{filename}.json'
+
+    results = model(filepath_image)
+
+    teeth_roi = get_teeth_ROI(results)
+    teeth_roi_images = teeth_roi['images'][filename]
+    teeth_roi_split_teeth = teeth_roi['split_teeth']
+
+    labels = get_labels_by_image(filepath_json, target_labels)
+    method_name()
+
+# In[8]:
+
+
+# for tooth_number, r in region.items():
+#     print(r)
+# target_roi
+# label
+# !jupyter nbconvert --to script prepare_classify_format.ipynb
+
+j = json.dumps(image_labels)
+
+with open('image_labels_for_classify.json.bak', 'w') as f:
+    f.write(j)
+
+# ## Check json file and jpg file pair
+
+# In[9]:
+
+
+jpgs = list(data_dir.glob('*.jpg'))
+jsons = list(data_dir.glob('*.json'))
+
+jpgs_set = {jpg.stem for jpg in jpgs}
+jsons_set = {json_file.stem for json_file in jsons}
+
+(jpgs_set - jsons_set) | (jsons_set - jpgs_set)

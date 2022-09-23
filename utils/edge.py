@@ -28,6 +28,10 @@ all_tooth_number_dict = {
 }
 
 
+def consecutive(data, step_size=1):
+    return np.split(data, np.where(np.diff(data) != step_size)[0] + 1)
+
+
 def vertical_line_drawing(src, *args, color=0, thickness=3):
     height, width = src.shape
     result = src.copy()
@@ -170,6 +174,7 @@ def get_slope(source):
 
 # FIXME molar size change process
 # FIXME valley cross the tooth
+# TODO ver and hor finding function split
 def get_valley_window(slope, integral, window_size_0=50, left_margin_0=50):
     length = slope.shape[0]
     negative_slope_index = np.where(slope < 0)[0]
@@ -269,8 +274,12 @@ def get_valley_window(slope, integral, window_size_0=50, left_margin_0=50):
 
 def gum_jaw_separation(source, flag='upper'):
     margin = 30
-    theta, hor = get_rotation_angle(source, flag=flag)
-    source = ndimage.rotate(source, theta, reshape=True, cval=255)
+    padding = 100
+
+    if flag == 'upper':
+        source = source[padding:, :]
+    elif flag == 'lower':
+        source = source[:-padding, :]
 
     hor, _ = integral_intensity_projection(source)
     hor = window_avg(hor)
@@ -292,17 +301,26 @@ def gum_jaw_separation(source, flag='upper'):
         # didn't get gum_sep_line in hor_valleys
         gum_sep_line = jaw_sep_line - 100 - margin if flag == 'upper' else jaw_sep_line + 100 + margin
 
-    return gum_sep_line, jaw_sep_line, theta, hor_valleys, hor
+    if flag == 'upper':
+        gum_sep_line, jaw_sep_line = gum_sep_line + padding, jaw_sep_line + padding
+
+    return gum_sep_line, jaw_sep_line, hor_valleys, hor
 
 
-def get_rotation_angle(source, flag='upper'):
+def get_rotation_angle(source, flag='upper', tooth_position='middle'):
     source = np.pad(source, (100, 100), mode='constant', constant_values=255)
     minimum_value = np.Inf
     target_angle = 0
     result_hor = []
 
-    y = 0
-    for i in range(-20, 21):
+    if tooth_position == 'left':
+        angle_range = range(0, 21)
+    elif tooth_position == 'right':
+        angle_range = range(-20, 1)
+    else:
+        return target_angle
+
+    for i in angle_range:
         source_r = ndimage.rotate(source, i, reshape=False, cval=255)
         hor, _ = integral_intensity_projection(source_r)
 
@@ -333,12 +351,11 @@ def get_rotation_angle(source, flag='upper'):
         #
         # plt.show()
 
-    return target_angle, result_hor
+    return target_angle
 
 
-# TODO different window_size for molar and pre-molar
 # TODO refined curve
-def vertical_separation(source, flag='upper', tooth_type='molar'):
+def vertical_separation(source, flag='upper', tooth_type='molar', angle=0):
     window_size_0_dict = {
         'incisor': 40,
         # TODO test window_size_0 change by angle
@@ -358,25 +375,80 @@ def vertical_separation(source, flag='upper', tooth_type='molar'):
 
 
 def tooth_isolation(source, flag='upper', tooth_position='left', filename=None, save=False, rotation_fix=False):
-    # Find jaw separation line and gums separation
-    # FIXME jaw_spe_line in lower missing
+    """
+    Input image and some args to get the tooth in this region.
+
+    Args:
+        source:
+        flag:
+        tooth_position:
+        filename:
+        save:
+        rotation_fix:
+
+    Returns:
+        crop_regions: dict of tooth, and it's location.
+        angle: the angle of tooth region image rotate.
+    """
+    # Find angle to rotate image.
     crop_regions = {}
-    gum_sep_line, jaw_sep_line, theta, hor_valleys, hor = gum_jaw_separation(source, flag=flag)
-    source_rotated = source.copy()
-    if tooth_position == 'middle':
-        theta = 0
-    else:
-        source_rotated = ndimage.rotate(source, theta, reshape=True, cval=255)
+
+    theta = get_rotation_angle(source, flag=flag, tooth_position=tooth_position)
+    source_rotated = ndimage.rotate(source, theta, reshape=True, cval=255)
+
+    # Find ROI
+    gum_sep_line, jaw_sep_line, hor_valleys, hor = gum_jaw_separation(source_rotated, flag=flag)
+
+    height, width = source.shape
+    phi = np.radians(abs(theta))
+    opposite = np.sin(phi) * width
+    adjacent = np.cos(phi) * height
 
     if flag == 'upper':
         source_roi = source_rotated[gum_sep_line:jaw_sep_line, :]
+        y1 = gum_sep_line
+        y2 = jaw_sep_line
     elif flag == 'lower':
         source_roi = source_rotated[jaw_sep_line:gum_sep_line, :]
+        y1 = jaw_sep_line
+        y2 = gum_sep_line
     else:
         raise ValueError(f'flag only accept upper or lower but get {flag}.')
 
+    if theta > 0:
+        left_padding = round((y2 - opposite) * np.tan(phi))
+        right_padding = round((adjacent - y1) * np.tan(phi))
+        source_roi = source_roi[:, left_padding:-right_padding]
+    elif theta < 0:
+        left_padding = round((adjacent - y1) * np.tan(phi))
+        right_padding = round((y2 - opposite) * np.tan(phi))
+        source_roi = source_roi[:, left_padding:-right_padding]
+
+    # Split tooth
     tooth_type = 'incisor' if tooth_position == 'middle' else 'molar'
-    window_position, valleys, ver, ver_slope = vertical_separation(source_roi, flag=flag, tooth_type=tooth_type)
+    window_position, valleys, ver, ver_slope = vertical_separation(source_roi, flag=flag, tooth_type=tooth_type,
+                                                                   angle=theta)
+    # Missing tooth detection
+    ver_mean = ver.mean()
+    tooth_missing_region = []
+    for i in range(ver.shape[0] - 1):
+        is_derivative_smooth = abs(ver_slope[i] - ver_slope[i + 1]) < 45
+        curve_under_mean = ver[i] < ver_mean
+
+        if is_derivative_smooth and curve_under_mean:
+            tooth_missing_region.append(i)
+    tooth_missing_region = consecutive(tooth_missing_region)
+    tooth_missing_region = [(i[0], i[-1]) for i in tooth_missing_region if len(i) > 60]
+
+    # Delete redundant valley
+    for i in tooth_missing_region:
+        valley_between_missing_tooth = ((i[0] < valleys) & (valleys < i[1]))
+        valley_near_missing_tooth = np.logical_or(np.abs(valleys - i[0]) < 20, np.abs(valleys - i[1]) < 20)
+        valley_need_delete = np.logical_or(valley_between_missing_tooth, valley_near_missing_tooth)
+
+        valleys = valleys[~valley_need_delete]
+        valleys = np.append(valleys, i)
+
     bounding_number = len(valleys) - 1
 
     # Check tooth number
@@ -399,6 +471,7 @@ def tooth_isolation(source, flag='upper', tooth_position='left', filename=None, 
     else:
         raise ValueError(f'flag only accept upper or lower but get {flag}.')
 
+    # Output detect result
     unknown_counter = 50
     source_rgb = cv.cvtColor(source_rotated, cv.COLOR_GRAY2RGB)
     bounding_boxes = []
@@ -494,6 +567,32 @@ def bounding_teeth_on_origin(results, save=False, rotation_fix=False):
         plt.show()
 
     return teeth_region
+
+
+def quick_get_roi(image_name, model=None, roi_index=0):
+    # model = torch.hub.load(r'..\YOLO', 'custom', path=r'..\YOLO\weights\8-bound.pt', source='local')
+
+    tooth_position_dict = {
+        0: 'left',
+        1: 'middle',
+        2: 'right'
+
+    }
+    filename = image_name.stem
+
+    results = model(image_name)
+    teeth_roi = get_teeth_ROI(results)
+    teeth_roi_images = teeth_roi['images'][filename]
+    teeth_roi_split_teeth = teeth_roi['split_teeth']
+
+    target_roi = teeth_roi_images[roi_index]
+    target_roi_image = target_roi['image']
+    flag = target_roi['flag']
+    tooth_position = tooth_position_dict[target_roi['number']]
+    im_g = cv.cvtColor(target_roi_image, cv.COLOR_RGBA2GRAY)
+    im_g_shape = np.array(np.array(im_g.shape)[[1, 0]])
+
+    return im_g, flag, tooth_position
 
 
 if __name__ == '__main__':

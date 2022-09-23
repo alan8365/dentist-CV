@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 
-from util import integral_intensity_projection, vertical_line_drawing, horizon_line_drawing, gum_jaw_separation, \
+from utils.edge import integral_intensity_projection, vertical_line_drawing, horizon_line_drawing, gum_jaw_separation, \
     get_rotation_angle, window_avg, get_valley_window, get_slope, vertical_separation
 from glob import glob
 from scipy import ndimage, misc
@@ -29,9 +29,11 @@ if __name__ == '__main__':
         flag, region, _ = image_path.split('\\')[-1].split('-')
         tooth_type = 'incisor' if region == 1 else 'molar'
 
-        gum_sep_line, jaw_sep_line, theta, hor_valleys, hor = gum_jaw_separation(image, flag=flag)
-
+        theta = get_rotation_angle(image, flag=flag)
         image = ndimage.rotate(image, theta, reshape=True, cval=255)
+
+        gum_sep_line, jaw_sep_line, hor_valleys, hor = gum_jaw_separation(image, flag=flag)
+
 
         if flag == 'upper':
             image_roi = image[gum_sep_line:jaw_sep_line, :]
@@ -39,7 +41,7 @@ if __name__ == '__main__':
             image_roi = image[jaw_sep_line:gum_sep_line, :]
         else:
             raise ValueError(f'flag only accept upper or lower but get {flag}.')
-        
+
         window_position, valleys, ver, ver_slope = vertical_separation(image_roi, flag=flag,
                                                                        tooth_type=tooth_type)
 

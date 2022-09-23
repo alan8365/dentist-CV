@@ -35,6 +35,12 @@ def get_teeth_ROI(detected_results, save=False):
         ]
     }
 
+    tooth_position_dict = {
+        0: 'left',
+        1: 'middle',
+        2: 'right'
+    }
+
     images = {}
     split_teeth = {}
     for i in range(len(detected_results)):
@@ -70,6 +76,7 @@ def get_teeth_ROI(detected_results, save=False):
                 right_tooth = teeth_dict[right_tooth_number]
 
                 region = crop_by_two_tooth(left_tooth, right_tooth)
+                tooth_position = tooth_position_dict[number]
 
                 save_filename = f'{flag}-{number}-{file_name}'
                 save_file = Path(f'./crops/{save_filename}.jpg')
@@ -80,6 +87,7 @@ def get_teeth_ROI(detected_results, save=False):
                 image_data = {
                     'flag': flag,
                     'number': number,
+                    'tooth_position': tooth_position,
                     'org_file_name': file_name,
                     'offset': np.array([region[0], region[1]]),
                     'image': im,
