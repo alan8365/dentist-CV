@@ -20,6 +20,10 @@ from utils.preprocess import rect_include_another, rotate_bounding_boxes, xyxy_r
 from utils.yolo import get_teeth_ROI
 from utils.edge import tooth_isolation, bounding_teeth_on_origin, get_all_teeth
 
+import warnings
+
+warnings.filterwarnings("ignore")
+
 
 def main(dir):
     load_dotenv()
