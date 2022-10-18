@@ -23,9 +23,10 @@ from utils.edge import tooth_isolation, bounding_teeth_on_origin, get_all_teeth
 
 def main(dir):
     load_dotenv()
+    YOLO_model_dir = Path(os.getenv('YOLO_MODEL_DIR'))
 
-    tooth_detect_model = torch.hub.load(r'.\YOLO', 'custom', path=r'.\YOLO\weights\8-bound.pt', source='local')
-    anomaly_detect_model = torch.hub.load(r'.\YOLO', 'custom', path=r'.\YOLO\weights\anomaly.pt', source='local')
+    tooth_detect_model = torch.hub.load('YOLO', 'custom', path=YOLO_model_dir / '8-bound.pt', source='local')
+    anomaly_detect_model = torch.hub.load('YOLO', 'custom', path=YOLO_model_dir / 'anomaly.pt', source='local')
 
     data_dir = Path(dir)
     image_names = list(data_dir.glob('*.jpg'))
