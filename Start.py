@@ -1,5 +1,7 @@
 import argparse
 import json
+import sys
+import os
 
 from utils.core import main
 
@@ -30,22 +32,33 @@ if __name__ == '__main__':
 
     text = """Tx:Check Panoramic radiography films for initial examination in this year
     C.F.:
-    1.缺牙: 47
-    2.殘根: 16 25  埋伏齒: no finding
-    3.固定補綴物: no finding
-    4.齲齒: 17 18
-    5.曾經根管治療: 15 16 24"""
+    1.缺牙: %(missing)s
+    2.殘根: %(R.R)s  埋伏齒: %(embedded)s
+    3.固定補綴物: %(filling)s
+    4.齲齒: %(caries)s
+    5.曾經根管治療: %(endo)s"""
 
     predict = {}
-    anomaly_list = ['R.R', 'caries', 'crown', 'endo', 'filling', 'post', 'filling', 'Imp', 'embedded', 'impacted',
-                    'missing']
+    anomaly_list = ['R.R', 'caries', 'crown', 'endo', 'post', 'filling', 'Imp', 'embedded', 'impacted', 'missing']
     for filename, teeth in tooth_anomaly_dict.items():
         filename = f'{filename}.jpg'
-        predict[filename] = {anomaly: [] for anomaly in anomaly_list}
+        predict[filename] = {}
+
+        teeth_anomalies_dict = {anomaly: [] for anomaly in anomaly_list}
         for tooth_number, anomalies in teeth.items():
             for anomaly in anomalies:
-                predict[filename][anomaly].append(tooth_number)
-    print(predict)
+                teeth_anomalies_dict[anomaly].append(tooth_number)
+
+        text_anomalies_list = ['missing', 'R.R', 'embedded', 'filling', 'caries', 'endo']
+        text_dict = {
+            anomaly: ' '.join(map(str, teeth_anomalies_dict[anomaly])) if teeth_anomalies_dict[
+                anomaly] else 'no finding' for
+            anomaly in text_anomalies_list}
+
+        predict[filename]['text'] = text % text_dict
+        predict[filename]['data'] = teeth_anomalies_dict
+
+    # print(predict)
 
     # predict = {
     #     "img01.jpg": {

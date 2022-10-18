@@ -65,7 +65,7 @@ def _create(name, pretrained=True, channels=3, classes=80, autoshape=True, verbo
         raise Exception(s) from e
 
 
-def custom(path='path/to/model.pt', autoshape=True, verbose=True, device=None):
+def custom(path='path/to/model.pt', autoshape=True, verbose=False, device=None):
     # YOLOv5 custom or local model
     return _create(path, autoshape=autoshape, verbose=verbose, device=device)
 

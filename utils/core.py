@@ -25,12 +25,12 @@ def main(dir):
     load_dotenv()
     YOLO_model_dir = Path(os.getenv('YOLO_MODEL_DIR'))
 
-    tooth_detect_model = torch.hub.load('YOLO', 'custom', path=YOLO_model_dir / '8-bound.pt', source='local')
+    tooth_detect_model = torch.hub.load('YOLO', 'custom', path=YOLO_model_dir / '8-bound.pt', source='local',
+                                        verbose=False)
     anomaly_detect_model = torch.hub.load('YOLO', 'custom', path=YOLO_model_dir / 'anomaly.pt', source='local')
 
     data_dir = Path(dir)
     image_names = list(data_dir.glob('*.jpg'))
-    image_names = image_names[:5]
 
     results = tooth_detect_model(image_names)
     anomaly_results = anomaly_detect_model(image_names)
