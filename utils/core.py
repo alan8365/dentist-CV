@@ -62,11 +62,11 @@ def main(dir):
     # Vit model loading
     model_dir = '.' / Path(os.getenv('ViT_MODEL_DIR'))
     model_path = model_dir / 'classifier-6.pt'
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     vit_model = timm.create_model('vit_base_patch16_224', num_classes=6)
-    vit_model.load_state_dict(torch.load(model_path))
+    vit_model.load_state_dict(torch.load(model_path, map_location=device))
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     batch_size = 16
     num_workers = 0
 
