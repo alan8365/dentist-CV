@@ -47,15 +47,15 @@ jmespath==1.0.1
 joblib==1.1.0
 json5==0.9.6
 jsonschema==4.4.0
-jupyter==1.0.0
-jupyter-client==6.1.7
-jupyter-console==6.4.3
-jupyter-core==4.7.0
-jupyter-server==1.18.1
-jupyterlab==3.4.4
-jupyterlab-pygments==0.1.2
-jupyterlab-server==2.12.0
-jupyterlab-widgets==1.0.0
+jupyter==1.0.0; platform_system == 'Windows'
+jupyter-client==6.1.7; platform_system == 'Windows'
+jupyter-console==6.4.3; platform_system == 'Windows'
+jupyter-core==4.7.0; platform_system == 'Windows'
+jupyter-server==1.18.1; platform_system == 'Windows'
+jupyterlab==3.4.4; platform_system == 'Windows'
+jupyterlab-pygments==0.1.2; platform_system == 'Windows'
+jupyterlab-server==2.12.0; platform_system == 'Windows'
+jupyterlab-widgets==1.0.0; platform_system == 'Windows'
 kiwisolver==1.4.4
 lazy-object-proxy==1.4.3
 Markdown==3.4.1
