@@ -1,12 +1,12 @@
 import torch
+from PIL import Image
+from yolov5.utils.general import increment_path
 
 from yolov5.utils.plots import Annotator, colors, save_one_box
-from glob import glob
-
-import matplotlib
-import matplotlib.pyplot as plt
 from pathlib import Path
+
 import numpy as np
+import cv2
 
 
 def crop_by_two_tooth(left, right, margin=50):
@@ -56,11 +56,14 @@ def get_teeth_ROI(detected_results, save=False):
 
             for j in range(len(bounds)):
                 *xyxy, _, cls = bounds[j]
+                xyxy = torch.vstack(xyxy)
 
                 cls = int(cls.item())
                 name = detected_results.names[cls]
                 teeth_dict[name] = xyxy
-                split_teeth[file_name][name] = {'xyxy': xyxy}
+
+                crop_image = crop_by_xyxy(img, xyxy.int())
+                split_teeth[file_name][name] = {'xyxy': xyxy, 'crop_image': crop_image, 'is_missing': False}
 
             teeth_detected_flag = [f in teeth_dict for f in flag_list]
 
@@ -91,6 +94,7 @@ def get_teeth_ROI(detected_results, save=False):
                     'org_file_name': file_name,
                     'offset': np.array([region[0], region[1]]),
                     'image': im,
+                    'xyxy': region,
                 }
 
                 images[file_name].append(image_data)
@@ -108,11 +112,13 @@ def get_teeth_ROI(detected_results, save=False):
     # plt.show()
 
 
-if __name__ == "__main__":
-    model = torch.hub.load('.', 'custom', path=r'.\weights\8-bound.pt', source='local')
-    # Image
-    imgs = glob('../../Datasets/phase-2/*.jpg')
-    # Inference
-    results = model(imgs[:10])
+def crop_by_xyxy(image, xyxy, save=False, file=Path('im.jpg')):
+    x1, y1, x2, y2 = xyxy
+    result = image[y1:y2, x1:x2]
 
-    get_teeth_ROI(results)
+    if save:
+        file.parent.mkdir(parents=True, exist_ok=True)  # make directory
+        f = str(increment_path(file).with_suffix('.jpg'))
+        # cv2.imwrite(f, crop)  # https://github.com/ultralytics/yolov5/issues/7007 chroma subsampling issue
+        Image.fromarray(result).save(f, quality=95, subsampling=0)
+    return result

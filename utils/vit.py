@@ -56,6 +56,7 @@ def test(dataloader, model, loss_fn, classes_size, threshold=0.5, device=torch.d
         for X, y in dataloader:
             X, y = X.to(device), y.to(device)
             pred = model(X)
+            pred = torch.sigmoid(pred)
 
             test_loss += loss_fn(pred, y).item()
 
@@ -82,8 +83,8 @@ def test(dataloader, model, loss_fn, classes_size, threshold=0.5, device=torch.d
 
     tp, fp, tn, fn = confusion_table.sum(axis=1)
     accuracy = (tp + tn) / confusion_table.sum()
-    precision = 0 if tp + fp == 0 else tp / (tp + fp)
-    sensitivity = 0 if tp + fn == 0 else tp / (tp + fn)
+    precision = float('nan') if tp + fp == 0 else tp / (tp + fp)
+    sensitivity = float('nan') if tp + fn == 0 else tp / (tp + fn)
 
     print("Test Error:")
     print(f"Accuracy: {(100 * accuracy):>0.1f}%, Avg loss: {test_loss:>8f}")
@@ -99,8 +100,8 @@ def test(dataloader, model, loss_fn, classes_size, threshold=0.5, device=torch.d
         tp, fp, tn, fn = col
 
         accuracy = (tp + tn) / col.sum()
-        precision = 0 if tp + fp == 0 else tp / (tp + fp)
-        sensitivity = 0 if tp + fn == 0 else tp / (tp + fn)
+        precision = float('nan') if tp + fp == 0 else tp / (tp + fp)
+        sensitivity = float('nan') if tp + fn == 0 else tp / (tp + fn)
 
         classes_name = classes[idx]
         print(f'Class {classes_name}:')

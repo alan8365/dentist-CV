@@ -8,7 +8,7 @@ from sklearn.preprocessing import MultiLabelBinarizer
 
 
 class ToothCropClassDataset(Dataset):
-    def __init__(self, root, transform=None, target_transform=None, non_label_include=False):
+    def __init__(self, root, transform=None, target_transform=None, non_label_include=False, train=True):
         root = Path(root)
 
         self.transform = transform

@@ -42,6 +42,13 @@ def xywh2xyxy(x):
     return y
 
 
+def rect_center_distance(box1, box2, xyxy=True):
+    box1 = torch.Tensor(box1)
+    box2 = torch.Tensor(box2)
+
+    xyxy2xywh([box1, box2])
+
+
 def rect_include_another(box_out, box_in, eps=1e-9):
     # Get the coordinates of bounding boxes
     box_in = torch.Tensor(box_in)
@@ -167,7 +174,6 @@ def recovery_rotated_bounding(theta, org_image_shape, bounding_boxes):
 
     margin = np.array([offset[0], offset[1], 0, 0])
     bounding_boxes_rotated = bounding_boxes_rotated + margin[:, None]
-    print(bounding_boxes_rotated)
     bounding_boxes_rotated = xywh2xyxy(bounding_boxes_rotated.transpose()).astype(int)
 
     return bounding_boxes_rotated
