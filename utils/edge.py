@@ -229,8 +229,9 @@ def get_valley_window(slope, integral, window_size_0=50, left_margin_0=50):
 
         i += 1
 
+    # last window may not include last valley
     last_window_size = length - window_position[-1]
-    if last_window_size > window_size_0:
+    if last_window_size > window_size_0 // 2:
         window_position.append(length - 1)
         window_size.append(last_window_size)
 
@@ -244,8 +245,26 @@ def get_valley_window(slope, integral, window_size_0=50, left_margin_0=50):
         start = window_position[i]
         end = window_position[i + 1]
 
-        valley_position = integral[start:end + 1].argmin() + start
-        valleys.append(valley_position)
+        # Peak finding
+        has_significant_peak = False
+
+        peaks, properties = find_peaks(integral[start:end], height=0)
+        peaks += start
+        if len(peaks) > 0:
+            peak = peaks[integral[peaks].argmax()]
+            if len(peaks) > 1:
+                peaks_diff = integral[peaks] - integral[peak]
+                has_significant_peak = np.logical_or(peaks_diff < -100, peaks_diff == 0).all()
+            else:
+                has_significant_peak = True
+
+        if has_significant_peak:
+            # TODO check start is necessary
+            zero_point_near_peak = np.abs(integral[start:peak]).argmin() + start
+            valleys.append(zero_point_near_peak)
+        else:
+            valley_position = integral[start:end + 1].argmin() + start
+            valleys.append(valley_position)
 
     # non valley check
     # calculate distance between two valley
@@ -453,7 +472,7 @@ def tooth_isolation(source, flag='upper', tooth_position='left', filename=None, 
     # Delete redundant valley
     for missing_region in tooth_missing_region:
         peaks, _ = find_peaks(ver_slope[missing_region[0]:missing_region[1]], height=0)
-        if ver_slope[peaks + missing_region[0]].max() > 100:
+        if not peaks or ver_slope[peaks + missing_region[0]].max() > 100:
             continue
 
         valley_between_missing_tooth = ((missing_region[0] < valleys) & (valleys < missing_region[1]))
@@ -512,7 +531,7 @@ def tooth_isolation(source, flag='upper', tooth_position='left', filename=None, 
         else:
             crop_source = source_rotated
 
-        save_filename = f'{filename}-{tooth_number}'
+        save_filename = f'{filename} {tooth_number}'
         save_file = Path(f'./crops/{filename}/{save_filename}.jpg')
         crop_image = crop_by_xyxy(crop_source, xyxy.int(), save=save, file=save_file)
         # crop_image = crop_by_xyxy(crop_source, xyxy.int())

@@ -96,7 +96,7 @@ def main(dir):
     vit_model.to(device)
     vit_model.eval()
 
-    threshold = 1
+    threshold = torch.Tensor([0.5, 0.85, 0.5, 0.5, 0.5, 0.5]).to(device)
     pred_encodes = []
     # target_labels = ['caries', 'endo', 'post', 'crown']
     target_labels = ['R.R', 'caries', 'crown', 'endo', 'filling', 'post']
@@ -115,13 +115,11 @@ def main(dir):
         detected_list[i] = tuple((target_labels[j] for j, checker in enumerate(pred_encode) if checker))
 
     # Final process
-    tooth_anomaly_dict = {}
+    tooth_anomaly_dict = {anomaly_results.files[i][:-4]: {} for i in range(len(anomaly_results))}
+
     for i, detected in enumerate(detected_list):
         current_filename, region_name, tooth_number = dataset.filename(i).split()
         tooth_number = int(tooth_number[:2])
-
-        if current_filename not in tooth_anomaly_dict.keys():
-            tooth_anomaly_dict[current_filename] = {}
 
         if tooth_number < 50:
             tooth_anomaly_dict[current_filename][tooth_number] = set(detected)

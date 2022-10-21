@@ -87,11 +87,11 @@ def get_image_label(dataset_dir=None, save=True):
             data = json.load(f)
 
             shapes = data['shapes']
-            labels = {shape['label'] for shape in shapes}
+            labels = [shape['label'] for shape in shapes]
 
             filename, _ = os.path.splitext(os.path.basename(json_file))
 
-            d.update({filename: {i: (i in labels) for i in col_names}})
+            d.update({filename: {i: (labels.count(i)) for i in col_names}})
 
     df = pd.DataFrame.from_dict(d, orient='index')
     if save:
@@ -100,16 +100,18 @@ def get_image_label(dataset_dir=None, save=True):
     return df
 
 
-def get_image_by_labels(target_labels, file_name='label_TF.csv'):
+def get_image_by_labels(target_labels=None, file_name='label_TF.csv'):
     if os.path.isfile(file_name):
         df = pd.read_csv(file_name, index_col='filename')
     else:
         # FIXME path rewrite
         df = get_image_label()
 
-    result_mask = df[target_labels].any(axis=1)
+    if target_labels:
+        result_mask = df[target_labels].any(axis=1)
+        df = df[result_mask]
 
-    return df[result_mask]
+    return df
 
 
 def get_labels_by_image(filepath, target_labels=None):

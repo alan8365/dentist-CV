@@ -35,7 +35,7 @@ def train(dataloader, model, loss_fn, optimizer, writer: SummaryWriter = None, e
 
         if batch % 100 == 0:
             loss, current = loss.item(), batch * len(X)
-            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+            # print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
             writer.add_scalar('Loss/train', loss, epoch)
 
@@ -86,9 +86,9 @@ def test(dataloader, model, loss_fn, classes_size, threshold=0.5, device=torch.d
     precision = float('nan') if tp + fp == 0 else tp / (tp + fp)
     sensitivity = float('nan') if tp + fn == 0 else tp / (tp + fn)
 
-    print("Test Error:")
-    print(f"Accuracy: {(100 * accuracy):>0.1f}%, Avg loss: {test_loss:>8f}")
-    print(f"Precision: {(100 * precision):>0.1f}%, Sensitivity: {(100 * sensitivity):>0.1f}% \n")
+    # print("Test Error:")
+    # print(f"Accuracy: {(100 * accuracy):>0.1f}%, Avg loss: {test_loss:>8f}")
+    # print(f"Precision: {(100 * precision):>0.1f}%, Sensitivity: {(100 * sensitivity):>0.1f}% \n")
 
     writer.add_scalar('Loss/test', test_loss, epoch)
 
@@ -104,13 +104,26 @@ def test(dataloader, model, loss_fn, classes_size, threshold=0.5, device=torch.d
         sensitivity = float('nan') if tp + fn == 0 else tp / (tp + fn)
 
         classes_name = classes[idx]
-        print(f'Class {classes_name}:')
-        print(f"Accuracy: {(100 * accuracy):>0.1f}%")
-        print(f"Precision: {(100 * precision):>0.1f}%, Sensitivity: {(100 * sensitivity):>0.1f}%")
+        # print(f'Class {classes_name}:')
+        # print(f"Accuracy: {(100 * accuracy):>0.1f}%")
+        # print(f"Precision: {(100 * precision):>0.1f}%, Sensitivity: {(100 * sensitivity):>0.1f}%")
 
         writer.add_scalars('Accuracy/test', {classes_name: accuracy}, epoch)
         writer.add_scalars('Precision/test', {classes_name: precision}, epoch)
         writer.add_scalars('Sensitivity/test', {classes_name: sensitivity}, epoch)
+
+
+def evaluation(dataloader, model, loss_fn, classes_size, threshold=0.5, device=torch.device('cpu'),
+               writer: SummaryWriter = None,
+               classes=None):
+    # TODO PR curve
+    # TODO confusion matrix
+    pass
+
+    idx = 1
+    classes_name = classes[idx]
+
+    # writer.add_pr_curve(classes_name, )
 
 
 def padding_to_size(image, size):
