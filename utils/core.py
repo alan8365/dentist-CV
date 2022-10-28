@@ -99,7 +99,8 @@ def main(dir):
     threshold = torch.Tensor([0.5, 0.85, 0.5, 0.5, 0.5, 0.5]).to(device)
     pred_encodes = []
     # target_labels = ['caries', 'endo', 'post', 'crown']
-    target_labels = ['R.R', 'caries', 'crown', 'endo', 'filling', 'post']
+    # target_labels = ['R.R', 'caries', 'crown', 'endo', 'filling', 'post']
+    target_labels = ['caries', 'crown', 'endo', 'filling', 'post']
     with torch.no_grad():
         for batch, (X, _) in enumerate(dataloader):
             X = X.to(device)
@@ -110,6 +111,7 @@ def main(dir):
             pred_encodes.append(pred_encode.cpu().numpy())
 
     pred_encodes = np.vstack(pred_encodes)
+    pred_encodes = pred_encodes[:, 1:]
     detected_list = [()] * len(pred_encodes)
     for i, pred_encode in enumerate(pred_encodes):
         detected_list[i] = tuple((target_labels[j] for j, checker in enumerate(pred_encode) if checker))
