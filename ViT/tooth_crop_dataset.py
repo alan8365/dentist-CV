@@ -20,7 +20,7 @@ class ToothCropClassDataset(Dataset):
         self.mlb = MultiLabelBinarizer()
         img_names = list(self.annotations.keys())
 
-        self.imgs = np.array([root / 'crops' / '-'.join(i.split('-')[:-1]) / f'{i}.jpg' for i in img_names])
+        self.imgs = np.array([root / 'crops' / i.split(' ')[0] / f'{i}.jpg' for i in img_names])
 
         self.labels = [self.annotations[i] for i in img_names]
         self.labels = self.mlb.fit_transform(self.labels)

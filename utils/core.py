@@ -68,7 +68,7 @@ def main(dir):
     model_path = model_dir / 'classifier-6.pt'
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    vit_model = timm.create_model('vit_base_patch16_224', num_classes=6)
+    vit_model = timm.create_model('swin_base_patch4_window7_224_in22k', num_classes=6)
     vit_model.load_state_dict(torch.load(model_path, map_location=device))
 
     batch_size = 16

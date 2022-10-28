@@ -14,6 +14,7 @@ from scipy.signal import find_peaks
 from yolov5.utils.plots import Annotator, save_one_box
 from utils.preprocess import recovery_rotated_bounding
 from utils.yolo import get_teeth_ROI, crop_by_xyxy
+from utils.general import integral_intensity_projection
 
 all_tooth_number_dict = {
     'upper': {
@@ -120,13 +121,6 @@ def blur_pooling(filename):
     # plt.show()
 
     return output
-
-
-def integral_intensity_projection(image):
-    ver = np.sum(image, axis=0).astype('int32')
-    hor = np.sum(image, axis=1).astype('int32')
-
-    return hor, ver
 
 
 def window_avg(source, window_size=5):
@@ -292,9 +286,9 @@ def get_valley_window(slope, integral, window_size_0=50, left_margin_0=50):
     return window_position, window_size, valleys
 
 
-def gum_jaw_separation(source, flag='upper', theta=0):
+def gum_jaw_separation(source, flag='upper'):
     margin = 30
-    padding = 100  # * abs(theta) // 10 + 1
+    padding = 150
     if flag == 'upper':
         source = np.flip(source, axis=0)
 
@@ -302,9 +296,8 @@ def gum_jaw_separation(source, flag='upper', theta=0):
 
     hor, _ = integral_intensity_projection(source)
     hor = window_avg(hor)
-    hor_slope = get_slope(hor)
 
-    window_position, window_size, hor_valleys = get_valley_window(hor_slope, hor, window_size_0=50, left_margin_0=30)
+    hor_valleys, _ = find_peaks(hor * -1)
 
     height, width = source.shape
 
@@ -336,10 +329,14 @@ def gum_jaw_separation(source, flag='upper', theta=0):
 
 
 def get_rotation_angle(source, flag='upper', tooth_position='middle'):
+    if flag == 'upper':
+        source = np.flip(source)
+
+    padding = 150
+    source = source[:-padding]
     source = np.pad(source, (100, 100), mode='constant', constant_values=255)
     minimum_value = np.Inf
     target_angle = 0
-    result_hor = []
 
     if tooth_position == 'left':
         angle_range = range(0, 21)
@@ -352,32 +349,11 @@ def get_rotation_angle(source, flag='upper', tooth_position='middle'):
         source_r = ndimage.rotate(source, i, reshape=False, cval=255)
         hor, _ = integral_intensity_projection(source_r)
 
-        if flag == 'upper':
-            hor_minimum = hor[100:].min()
-        elif flag == 'lower':
-            hor_minimum = hor[:-100].min()
-        else:
-            raise ValueError(f'flag only accept upper or lower but get {flag}.')
+        hor_minimum = hor[:-100].min()
 
         if hor_minimum < minimum_value:
             target_angle = i
             minimum_value = hor_minimum
-            result_hor = hor
-
-        # Plot every step of rotation
-        # fig, axs = plt.subplots(1, 2)
-        # fig.suptitle(f'theta = {i}, value={minimum_value}')
-        #
-        # axs[0].imshow(source_r, aspect='auto', cmap='gray')
-        #
-        # height, width = source_r.shape
-        # index = np.array(range(height))
-        # axs[1].plot(hor, index, 'g')
-        # axs[1].xaxis.tick_top()
-        #
-        # axs[1].set_ylim(height, 0)
-        #
-        # plt.show()
 
     return target_angle
 
@@ -426,7 +402,7 @@ def tooth_isolation(source, flag='upper', tooth_position='left', filename=None, 
     result['angle'] = theta
 
     # Find ROI
-    gum_sep_line, jaw_sep_line, hor_valleys, hor = gum_jaw_separation(source_rotated, flag=flag, theta=theta)
+    gum_sep_line, jaw_sep_line, hor_valleys, hor = gum_jaw_separation(source_rotated, flag=flag)
 
     height, width = source.shape
     phi = np.radians(abs(theta))
@@ -472,7 +448,7 @@ def tooth_isolation(source, flag='upper', tooth_position='left', filename=None, 
     # Delete redundant valley
     for missing_region in tooth_missing_region:
         peaks, _ = find_peaks(ver_slope[missing_region[0]:missing_region[1]], height=0)
-        if not peaks or ver_slope[peaks + missing_region[0]].max() > 100:
+        if len(peaks) < 1 or ver_slope[peaks + missing_region[0]].max() > 100:
             continue
 
         valley_between_missing_tooth = ((missing_region[0] < valleys) & (valleys < missing_region[1]))
