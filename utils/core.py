@@ -143,8 +143,10 @@ def main(dir):
 
             cls = int(cls.item())
             name = anomaly_results.names[cls]
-            if name in target_labels:
-                continue
+
+            # TODO set conf threshold.
+            # if name in target_labels:
+            #     continue
 
             # for x8 tooth
             if name in ['embedded', 'impacted']:

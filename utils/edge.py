@@ -169,8 +169,14 @@ def get_slope(source):
 
 # FIXME molar size change process
 # FIXME valley cross the tooth
-# TODO ver and hor finding function split
-def get_valley_window(slope, integral, window_size_0=50, left_margin_0=50):
+def get_valley_window(source, window_size_0=50, left_margin_0=50):
+    hor, ver = integral_intensity_projection(source)
+    ver = window_avg(ver)
+    ver_slope = get_slope(ver)
+
+    integral = ver
+    slope = ver_slope
+
     length = slope.shape[0]
     negative_slope_index = np.where(slope < 0)[0]
     positive_slope_index = np.where(slope > 0)[0]
@@ -234,6 +240,8 @@ def get_valley_window(slope, integral, window_size_0=50, left_margin_0=50):
         window_position = np.insert(window_position, 0, 0)
         window_size = np.insert(window_size, 0, window_position[1])
 
+    # intensity segment will large then 1 if horizon intensity has huge change.
+    intensity_segment = len(consecutive(np.where(hor < hor.max() * 0.8)[0]))
     valleys = []
     for i in range(len(window_size)):
         start = window_position[i]
@@ -252,7 +260,7 @@ def get_valley_window(slope, integral, window_size_0=50, left_margin_0=50):
             else:
                 has_significant_peak = True
 
-        if has_significant_peak:
+        if has_significant_peak and intensity_segment == 1:
             # TODO check start is necessary
             zero_point_near_peak = np.abs(integral[start:peak]).argmin() + start
             valleys.append(zero_point_near_peak)
@@ -373,7 +381,7 @@ def vertical_separation(source, flag='upper', tooth_type='molar', angle=0):
     _, ver = integral_intensity_projection(source)
     ver = window_avg(ver)
     ver_slope = get_slope(ver)
-    window_position, window_size, valleys = get_valley_window(ver_slope, ver, window_size_0=window_size_0)
+    window_position, window_size, valleys = get_valley_window(source, window_size_0=window_size_0)
 
     return window_position, valleys, ver, ver_slope
 
@@ -636,7 +644,7 @@ def quick_rotate_and_zooming(source, flag, tooth_position):
     theta = get_rotation_angle(source, flag=flag, tooth_position=tooth_position)
     source_rotated = ndimage.rotate(source, theta, reshape=True, cval=255)
 
-    gum_sep_line, jaw_sep_line, hor_valleys, hor = gum_jaw_separation(source_rotated, flag=flag, theta=theta)
+    gum_sep_line, jaw_sep_line, hor_valleys, hor = gum_jaw_separation(source_rotated, flag=flag)
 
     height, width = source.shape
     phi = np.radians(abs(theta))

@@ -21,7 +21,7 @@ def arg_parameter(arr):
 if __name__ == '__main__':
     # cmd參數初始化
     args = {
-        0: {"name": "Dir", "type": str, "default": ""},
+        0: {"name": "Dir", "type": str, "default": "test"},
     }
     # 取得cmd參數
     para = arg_parameter(args)
