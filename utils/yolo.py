@@ -11,6 +11,13 @@ import cv2
 from utils.general import integral_intensity_projection
 
 
+def test_curve_factory(middle_width, middle_height, a=-0.0004):
+    def foo(x):
+        return a * (x - middle_width) ** 2 + middle_height
+
+    return foo
+
+
 def crop_by_two_tooth(left, right, margin=50):
     # y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
     x_items = torch.Tensor([left[2], right[0]])
@@ -66,56 +73,15 @@ def get_teeth_ROI(detected_results, save=False):
         middle_height, middle_width = height // 2, width // 2
 
         hor, _ = integral_intensity_projection(im_g)
-        bias_range = 150
-        narrow_hor = hor[middle_height - bias_range: middle_height + bias_range]
-        middle_height = narrow_hor.argmin() + middle_height - bias_range
-
-        def test_curve_factory(a=-0.0004):
-            def foo(x):
-                return a * (x - middle_width) ** 2 + middle_height
-
-            return foo
-
-        weight_list = [-0.0002, -0.0003, -0.0004, -0.0005, ]
-        curve_intensity = []
-        for j in range(4):
-            weight = weight_list[i]
-
-            draw_x = np.linspace(0, width - 1, 1000).astype(np.int32)
-            draw_y = np.array(list(map(test_curve_factory(weight), draw_x))).astype(np.int32)
-
-            draw_x = draw_x[draw_y > 0]
-            draw_y = draw_y[draw_y > 0]
-            curve_intensity.append(sum(im_g[draw_y, draw_x]))
-        curve_intensity = np.array(curve_intensity)
-        vertical_test_curve = test_curve_factory(weight_list[curve_intensity.argmin()])
 
         tooth_bounds = []
         for j in range(len(bounds)):
             *xyxy, _, cls = bounds[j]
             xyxy = torch.vstack(xyxy)
-            mid_xy = [(xyxy[0] + xyxy[2]) / 2, (xyxy[1] + xyxy[3]) / 2]
 
             cls = int(cls.item())
             name = detected_results.names[cls]
-
-            vertical_pos, horizon_pos = tooth_number_flag_dict[name[0]]
-            testing_height = vertical_test_curve(mid_xy[0])
-
-            vertical_test = mid_xy[1] < testing_height if vertical_pos == 'upper' else mid_xy[1] > testing_height
-            horizon_test = mid_xy[0] < middle_width if horizon_pos == 'left' else mid_xy[0] > middle_width
-
-            if vertical_test and horizon_test:
-                change_dict = {1: 1, 2: 2, 3: 3, 4: 4}
-            elif vertical_test and not horizon_test:
-                change_dict = {1: 2, 2: 1, 3: 4, 4: 3}
-            elif not vertical_test and horizon_test:
-                change_dict = {1: 4, 4: 1, 2: 3, 3: 2}
-            else:
-                change_dict = {1: 3, 2: 4, 3: 1, 4: 2}
-
-            new_name = str(change_dict[int(name[0])]) + name[1]
-            tooth_bounds.append({'xyxy': xyxy, 'name': new_name})
+            tooth_bounds.append({'xyxy': xyxy, 'name': name})
 
         for flag in ('upper', 'lower'):
             teeth_dict = {}

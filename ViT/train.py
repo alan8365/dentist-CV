@@ -64,8 +64,8 @@ classes = dataset.mlb.classes_
 #     channels=1,
 #     dropout=0.2,
 # )
-model = timm.create_model('vit_base_patch16_224', num_classes=6, pretrained=True)
-# model = timm.create_model('swin_base_patch4_window7_224', num_classes=4, pretrained=True)
+# model = timm.create_model('vit_base_patch16_224', num_classes=6, pretrained=True)
+model = timm.create_model('swin_base_patch4_window7_224', num_classes=4, pretrained=True)
 model.to(device)
 
 criterion = nn.BCEWithLogitsLoss()

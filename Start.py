@@ -3,6 +3,8 @@ import json
 import sys
 import os
 
+from pathlib import Path
+
 from utils.core import main
 
 
@@ -18,18 +20,7 @@ def arg_parameter(arr):
     return arg.parse_args()
 
 
-if __name__ == '__main__':
-    # cmd參數初始化
-    args = {
-        0: {"name": "Dir", "type": str, "default": "test"},
-    }
-    # 取得cmd參數
-    para = arg_parameter(args)
-    # para.Dir 即可取得傳入的資料夾路徑
-    # print(para.Dir)
-
-    tooth_anomaly_dict = main(para.Dir)
-
+def report_process(anomaly_dict):
     text = """Tx:Check Panoramic radiography films for initial examination in this year
     C.F.:
     1.缺牙: %(missing)s
@@ -40,7 +31,7 @@ if __name__ == '__main__':
 
     predict = {}
     anomaly_list = ['R.R', 'caries', 'crown', 'endo', 'post', 'filling', 'Imp', 'embedded', 'impacted', 'missing']
-    for filename, teeth in tooth_anomaly_dict.items():
+    for filename, teeth in anomaly_dict.items():
         filename = f'{filename}.jpg'
         predict[filename] = {}
 
@@ -58,32 +49,26 @@ if __name__ == '__main__':
         predict[filename]['text'] = text % text_dict
         predict[filename]['data'] = teeth_anomalies_dict
 
-    # print(predict)
-
-    # predict = {
-    #     "img01.jpg": {
-    #         "text": text,
-    #         "data": {
-    #             "caries": [17, 18],
-    #             "endo": [15, 16, 24],
-    #             "R.R": [16, 25],
-    #         }
-    #     },
-    #     "img02.jpg": {
-    #         "text": text,
-    #         "data": {
-    #             "caries": [17, 18],
-    #             "endo": [15, 16, 24],
-    #             "R.R": [16, 25],
-    #         }
-    #     }
-    # }
-
-    result = {
+    return {
         "isSuccessful": True,
         "msg": "辨識完成",
         "predict": predict,
         "dir": para.Dir,  # 測試用請刪除
     }
+
+
+if __name__ == '__main__':
+    # cmd參數初始化
+    args = {
+        0: {"name": "Dir", "type": str, "default": "test"},
+    }
+    # 取得cmd參數
+    para = arg_parameter(args)
+    data_dir = Path(para.Dir) / 'test1'
+    image_names = list(data_dir.glob('*.jpg'))
+
+    tooth_anomaly_dict = main(image_names)
+
+    result = report_process(tooth_anomaly_dict)
 
     print(json.dumps(result, ensure_ascii=False))

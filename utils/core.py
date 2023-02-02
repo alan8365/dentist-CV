@@ -25,16 +25,16 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-def main(dir):
+def main(image_names, iou_threshold=0.5):
     load_dotenv()
     YOLO_model_dir = Path(os.getenv('YOLO_MODEL_DIR'))
 
-    tooth_detect_model = torch.hub.load('YOLO', 'custom', path=YOLO_model_dir / '8-bound.pt', source='local',
+    tooth_detect_model = torch.hub.load(str((YOLO_model_dir / '..').resolve()), 'custom', path=YOLO_model_dir / '8-bound.pt', source='local',
                                         verbose=False)
-    anomaly_detect_model = torch.hub.load('YOLO', 'custom', path=YOLO_model_dir / 'anomaly.pt', source='local')
+    anomaly_detect_model = torch.hub.load(str((YOLO_model_dir / '..').resolve()), 'custom', path=YOLO_model_dir / 'anomaly.pt', source='local')
 
-    data_dir = Path(dir)
-    image_names = list(data_dir.glob('*.jpg'))
+    # data_dir = Path(dir)
+    # image_names = list(data_dir.glob('*.jpg'))
 
     results = tooth_detect_model(image_names)
     anomaly_results = anomaly_detect_model(image_names)
@@ -126,12 +126,11 @@ def main(dir):
         if tooth_number < 50:
             tooth_anomaly_dict[current_filename][tooth_number] = set(detected)
 
-    iou_threshold = 0.5
     region_wisdom_tooth_dict = {
         'upper-left': 18,
         'upper-right': 28,
         'lower-left': 48,
-        'lower-right': 48,
+        'lower-right': 38,
     }
 
     for i in range(len(anomaly_results)):
@@ -188,14 +187,21 @@ def main(dir):
                 rotated_xyxy = np.array(rotated_xyxy) - np.tile(offset, 2)
                 rotated_xyxy = rotate_bounding_boxes(tooth_angle, region_image_shape, rotated_xyxy)
                 rotated_xyxy = rotated_xyxy[0].astype(int)
-                for tooth_number, tooth_data in region_tooth_data['crop_regions'].items():
-                    tooth_xyxy = tooth_data['xyxy']
 
-                    if rect_include_another(tooth_xyxy, rotated_xyxy) > iou_threshold:
-                        # if tooth_number not in result[current_filename].keys():
-                        #     result[current_filename][tooth_number] = {name}
-                        # else:
-                        tooth_anomaly_dict[current_filename][tooth_number].add(name)
+                tooth_number_candidate = []
+                for tooth_number, tooth_data in region_tooth_data['crop_regions'].items():
+                    if tooth_number >= 50:
+                        continue
+
+                    tooth_xyxy = tooth_data['xyxy']
+                    tooth_iou = rect_include_another(tooth_xyxy, rotated_xyxy)
+
+                    if tooth_iou > 0:
+                        tooth_number_candidate.append((tooth_number, tooth_iou))
+
+                if tooth_number_candidate:
+                    tooth_number, tooth_iou = max(tooth_number_candidate, key=lambda t: t[1])
+                    tooth_anomaly_dict[current_filename][tooth_number].add(name)
 
     for pair in missing_tooth:
         filename, tooth_number = pair
