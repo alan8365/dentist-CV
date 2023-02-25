@@ -13,8 +13,8 @@ tensorboard==2.9.1
 thop==0.1.1.post2207130030
 timm==0.6.7
 torch==1.10.0
-torchaudio==0.10.0
-torchvision==0.11.1
+torchaudio==0.10.1
+torchvision==0.11.2
 tqdm==4.64.0
 vit-pytorch==0.35.8
 yolov5==6.1.6

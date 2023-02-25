@@ -8,6 +8,8 @@ import pandas as pd
 from glob import glob
 from math import sin, cos
 
+from scipy import special
+
 
 def xyxy_reformat(x):
     # Convert nx4 boxes to xy1=top-left, xy2=bottom-right
@@ -156,6 +158,36 @@ def get_classification_format(teeth_region, target_labels, dataset_dir=None):
                 xyxy_out = value['xyxy']
                 if rect_include_another(xyxy_out, xyxy_in) > 0.5:
                     result.append({f'{json_filename}-{key}': label})
+
+
+def rotate_point(angle, org_shape, points, recovery=False):
+    h, w = org_shape
+    s, c = special.sindg(angle), special.cosdg(angle)
+
+    if recovery:
+        rot_matrix = np.array([[c, -s],
+                               [s, c]])
+    else:
+        rot_matrix = np.array([[c, s],
+                               [-s, c]])
+
+    if angle > 0:
+        p1 = np.array([0, w * s]).astype(int)
+    else:
+        s = abs(s)
+        p1 = np.array([h * s, 0]).astype(int)
+
+    if recovery:
+        offset = rot_matrix @ p1
+    else:
+        offset = p1 * -1
+
+    points = points.transpose()
+    points = rot_matrix @ points
+    points = points - offset[:, None]
+    points = points.transpose().astype(int)
+
+    return points
 
 
 def recovery_rotated_bounding(theta, org_image_shape, bounding_boxes):
