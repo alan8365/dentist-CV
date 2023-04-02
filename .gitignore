@@ -9,3 +9,6 @@ test
 
 dist
 build
+
+.DS_Store
+*/__pycache__
