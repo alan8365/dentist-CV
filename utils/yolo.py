@@ -1,14 +1,11 @@
+from pathlib import Path
+
+import cv2
+import numpy as np
 import torch
 from PIL import Image
 from yolov5.utils.general import increment_path
-
-from yolov5.utils.plots import Annotator, colors, save_one_box
-from pathlib import Path
-
-import numpy as np
-import cv2
-
-from utils.general import integral_intensity_projection
+from yolov5.utils.plots import save_one_box
 
 
 def test_curve_factory(middle_width, middle_height, a=-0.0004):
@@ -27,14 +24,14 @@ def crop_by_two_tooth(left_tooth, right_tooth, margin=50, padding=50):
     x_items = torch.Tensor([*left_tooth[x_indices], *right_tooth[x_indices]])
     y_items = torch.Tensor([*left_tooth[y_indices], *right_tooth[y_indices]])
 
-    x_items_padded = [torch.sum(x_items[[0, 1]]) / 2, torch.sum(x_items[[2, 3]]) / 2]
+    x_items_padded = [torch.sum(x_items[:2]) / 2, torch.sum(x_items[2:]) / 2]
 
     crop = torch.Tensor([
         x_items_padded[0],
         torch.min(y_items) - margin,
         x_items_padded[1],
         torch.max(y_items) + margin,
-        ])
+    ])
     crop = crop.int()
 
     return crop
@@ -48,13 +45,6 @@ def get_teeth_ROI(detected_results, save=False):
         'lower': [
             '47', '43', '33', '37'
         ]
-    }
-
-    tooth_number_flag_dict = {
-        '1': ('upper', 'left'),
-        '2': ('upper', 'right'),
-        '3': ('lower', 'right'),
-        '4': ('lower', 'left'),
     }
 
     tooth_position_dict = {
@@ -117,14 +107,18 @@ def get_teeth_ROI(detected_results, save=False):
             save_filename = f'{flag}-{number}-{file_name}'
             save_file = Path(f'./crops/{save_filename}.jpg')
 
-            im = save_one_box(region, img, save=False, file=save_file)
+            x1, y1, x2, y2 = region
+            im = img[y1:y2, x1:x2]
             # print(f'First ROI process: {save_filename} done.')
 
+            left_padding = torch.div(left_tooth[2] - left_tooth[0], 2, rounding_mode='floor')
+            right_padding = torch.div(right_tooth[2] - right_tooth[0], 2, rounding_mode='floor')
             image_data = {
                 'flag': flag,
                 'tooth_position': tooth_position,
                 'org_file_name': file_name,
                 'offset': np.array([region[0], region[1]]),
+                'padding': {'left': left_padding, 'right': right_padding},
                 'image': im,
                 'xyxy': region,
             }

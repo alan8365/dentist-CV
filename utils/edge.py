@@ -8,7 +8,12 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 from PIL import Image, ImageOps
 from scipy import ndimage
+from scipy import special
+from scipy.ndimage import rotate
 from scipy.signal import find_peaks
+from skimage import color
+from skimage.segmentation import mark_boundaries, slic
+from skimage.util import img_as_float
 from yolov5.utils.plots import Annotator
 
 from utils.general import integral_intensity_projection
@@ -30,6 +35,14 @@ all_tooth_number_dict = {
 
 
 def consecutive(data, step_size=1):
+    """
+    This function takes a list of numbers and splits it into sub-arrays of consecutive numbers.
+    Args:
+        data: A 1-D array of numerical data
+        step_size: The size of the step between consecutive elements in the array (default is 1)
+
+    Returns: An array of sub-arrays, each containing consecutive elements from the original array
+    """
     return np.split(data, np.where(np.diff(data) != step_size)[0] + 1)
 
 
@@ -159,6 +172,13 @@ def window_avg(source, window_size=5):
 
 
 def get_slope(source):
+    """
+    Args:
+        source: The source array to get the slope from
+
+    Returns:
+        An array of the same size as the input containing the slope of the source array at each index
+    """
     x = np.array(range(source.shape[0]))
 
     result = np.gradient(source, x)
@@ -331,6 +351,9 @@ def gum_jaw_separation(source, flag='upper', margin=30, padding=150):
     if flag == 'lower':
         default_return[0] = height - default_return[0]
         default_return[1] = height - default_return[1]
+    else:
+        default_return[0] = default_return[0] + padding
+        default_return[1] = default_return[1] + padding
 
     return default_return
 
@@ -613,6 +636,52 @@ def bounding_teeth_on_origin(results, save=False, rotation_fix=False):
         plt.show()
 
     return teeth_region
+
+
+def super_pixel(im_g, num_segments=30):
+    im_float = img_as_float(im_g)
+
+    labels = slic(im_float, n_segments=num_segments, compactness=0.3, sigma=5)
+
+    fig = plt.figure("Superpixels -- %d segments" % num_segments)
+    ax = fig.add_subplot(1, 1, 1)
+    ax.imshow(mark_boundaries(1 - im_float, labels))
+    plt.axis("off")
+
+    out = color.label2rgb(labels, im_float, kind='avg', bg_label=0)[:, :, 0]
+
+    return out
+
+
+def fill_rotate(im, im_roi_xyxy, theta, expand_size=None):
+    h_0, w_0 = im_roi_xyxy[3] - im_roi_xyxy[1], im_roi_xyxy[2] - im_roi_xyxy[0]
+
+    s, c = special.sindg(abs(theta)), special.cosdg(theta)
+
+    x_expand, y_expand = int(s * c * h_0), int(s * c * w_0)
+    if expand_size:
+        x_expand += expand_size[0]
+        y_expand += expand_size[1]
+    im_roi_xyxy_expand = im_roi_xyxy + np.array([-x_expand, -y_expand, x_expand, y_expand])
+    x1, y1, x2, y2 = im_roi_xyxy_expand
+    im_roi_expand = im[y1:y2, x1:x2]
+    if theta == 0:
+        return im_roi_expand
+
+    r_e = rotate(im_roi_expand, theta)
+
+    h, w = int(h_0 * c + w_0 * s), int(h_0 * s + w_0 * c)
+    h_e, w_e = r_e.shape
+
+    w_padding = (w_e - w) // 2
+    h_padding = (h_e - h) // 2
+    if expand_size:
+        w_padding -= expand_size[0]
+        h_padding -= expand_size[1]
+
+    r_e = r_e[h_padding:-h_padding, w_padding:-w_padding]
+
+    return r_e
 
 
 if __name__ == '__main__':

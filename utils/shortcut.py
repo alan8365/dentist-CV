@@ -1,9 +1,8 @@
 import json
 
-import torch
 import cv2 as cv
 import numpy as np
-
+import torch
 from scipy import ndimage
 from yolov5.models.common import Detections
 
@@ -18,14 +17,14 @@ def get_fake_result(image_name):
     with open(label_name, 'r') as f:
         label_file = json.load(f)
 
-    target_range = [''.join(i) for i in zip('11223344', '37' * 4)]
-    names = {i: v for i, v in enumerate(target_range)}
-    names_reverse = {v: i for i, v in enumerate(target_range)}
+    target_list = [''.join(i) for i in zip('11223344', '37' * 4)]
+    names = {i: v for i, v in enumerate(target_list)}
+    names_reverse = {v: i for i, v in enumerate(target_list)}
 
     xyxy = []
     for shape in label_file['shapes']:
         label = shape['label']
-        if label not in target_range:
+        if label not in target_list:
             continue
 
         temp = np.hstack(shape['points'] + [1] + [names_reverse[label]])
@@ -75,7 +74,7 @@ def quick_get_roi(image_name=None, model=None, roi_index=0, random_sample=False,
     im_g = cv.cvtColor(target_roi_image, cv.COLOR_RGBA2GRAY)
     im_g_shape = np.array(np.array(im_g.shape)[[1, 0]])
 
-    return im_g, flag, tooth_position, teeth_roi_split_teeth
+    return im_g, flag, tooth_position, teeth_roi_split_teeth, target_roi
 
 
 def quick_rotate_and_zooming(source, flag, tooth_position):
@@ -110,4 +109,38 @@ def quick_rotate_and_zooming(source, flag, tooth_position):
         right_padding = round((y2 - opposite) * t)
     source_roi = source_roi[:, left_padding:-right_padding]
 
+    if flag == 'upper':
+        gum_sep_line += 30
+    else:
+        gum_sep_line -= 30
+
     return source_roi, gum_sep_line, theta, [left_padding, right_padding]
+
+
+def quick_get_tooth(image_path, tooth_number):
+    im = cv.imread(str(image_path), cv.IMREAD_GRAYSCALE)
+
+    json_path = image_path.with_suffix('.json')
+
+    target_list = [''.join(i) for i in zip('11223344', '37' * 4)]
+    with open(json_path, 'r') as f:
+        labels = json.load(f)
+        labels.pop('imageData', None)
+
+    teeth_label = list(filter(lambda item: item['label'] in target_list, labels['shapes']))
+
+    for tooth_label in teeth_label:
+        if tooth_label['label'] == tooth_number:
+            points = tooth_label['points']
+            points = list(map(lambda point: list(map(int, point)), points))
+
+            [x1, y1], [x2, y2] = points
+            x1, x2 = min(x1, x2), max(x1, x2)
+            y1, y2 = min(y1, y2), max(y1, y2)
+
+            tooth_im = im[y1:y2, x1:x2]
+            xyxy = np.array([x1, y1, x2, y2])
+
+            return tooth_im, xyxy
+
+    raise AttributeError(f'tooth number {tooth_number} not found.')
