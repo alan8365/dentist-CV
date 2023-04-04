@@ -313,15 +313,15 @@ def get_valley_window(source, window_size_0=50, left_margin_0=50):
     return window_position, window_size, valleys
 
 
-def gum_jaw_separation(source, flag='upper', margin=30, padding=150):
+def gum_jaw_separation(source, flag='upper', margin=30, padding=200):
     if flag == 'lower':
         source = np.flip(source, axis=0)
 
     source = source[padding:, :]
+    source = cv.equalizeHist(source)
 
     hor, _ = integral_intensity_projection(source)
     hor = window_avg(hor)
-    hor_slope = get_slope(hor)
 
     hor_valleys, _ = find_peaks(hor * -1)
 
@@ -340,13 +340,16 @@ def gum_jaw_separation(source, flag='upper', margin=30, padding=150):
             # 根據經驗推估一個可能的位置
             gum_sep_line = jaw_sep_line - 130
         else:
-            gum_sep_line = gum_sep_line_pool[-1]
+            # before change
+            # gum_sep_line = gum_sep_line_pool[-1]
+            # after change
+            gum_sep_line = gum_sep_line_pool.min()
 
         gum_sep_line -= margin
 
-        if jaw_sep_line > height // 2:
-            default_return[0] = gum_sep_line
-            default_return[1] = jaw_sep_line
+    if jaw_sep_line > height // 3:
+        default_return[0] = gum_sep_line
+        default_return[1] = jaw_sep_line
 
     if flag == 'lower':
         default_return[0] = height - default_return[0]
