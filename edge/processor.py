@@ -1,6 +1,5 @@
 import cv2 as cv
 import numpy as np
-from matplotlib import pyplot as plt
 from scipy.signal import find_peaks
 
 from utils.edge import fill_rotate, get_rotation_angle, gum_jaw_separation
@@ -11,7 +10,7 @@ from utils.shortcut import get_fake_result
 from utils.yolo import get_teeth_ROI
 
 
-class ImageEdge:
+class ImageProcessor:
     tooth_number_dict = {
         'upper': {
             'left': ['17', '13'],
@@ -53,6 +52,7 @@ class ImageEdge:
             split_tooth['xyxy'] = split_tooth['xyxy'].int().numpy().squeeze()
 
         self.set_up_roi()
+        self.init_gap_in_roi()
 
     def set_up_roi(self):
         for target_roi in self.teeth_roi_images:
@@ -92,7 +92,6 @@ class ImageEdge:
             target_roi['gum_sep_line_global'] = gum_sep_line_global
 
             # Split teeth set up
-            # number = self.tooth_number_dict[flag][tooth_position][0]
             for number in self.tooth_number_dict[flag][tooth_position]:
                 split_tooth = self.split_teeth[number]
                 init_gap = self.find_global_gap_by_tooth(split_tooth['crop_image'], split_tooth['xyxy'], theta,
@@ -181,25 +180,25 @@ class ImageEdge:
 
         return gaps_global
 
-    def find_gap_in_roi(self):
+    def init_gap_in_roi(self):
         for target_roi in self.teeth_roi_images:
             flag = target_roi['flag']
             tooth_position = target_roi['tooth_position']
             xyxy = target_roi['xyxy'].numpy()
-            init_gap = self.template_points[flag]
+            init_gaps = self.template_points[flag]
 
             # Select gap in roi
-            ge = init_gap >= xyxy[:2]
-            le = init_gap <= xyxy[2:]
+            ge = init_gaps >= xyxy[:2]
+            le = init_gaps <= xyxy[2:]
 
             t = np.where(np.all(ge, axis=1) & np.all(le, axis=1))[0]
             init_gap_index = np.array([t[0] - 1, t[0], t[1], t[1] + 1])
 
             # Change gap's axis to zooming roi
-            init_gap = init_gap[init_gap_index]
-            init_gap -= xyxy[:2]
+            init_gaps = init_gaps[init_gap_index]
+            init_gaps -= xyxy[:2]
 
-            init_gap = rotate_point(target_roi['angle'], target_roi['image'].shape, init_gap)
+            init_gaps = rotate_point(target_roi['angle'], target_roi['image'].shape, init_gaps)
 
             if flag == 'upper':
                 margin_line = self.zooming_margin
@@ -209,25 +208,25 @@ class ImageEdge:
                 margin_line = h - self.zooming_margin
                 offset = target_roi['jaw_sep_line']
 
-            init_gap[:, 1] = [margin_line] * init_gap[:, 1].shape[0]
+            init_gaps[:, 1] = [margin_line] * init_gaps[:, 1].shape[0]
 
             # Calc new gap
-
             if tooth_position != 'middle':
                 # Add factor here
-                left_size = (init_gap[1] - init_gap[0])
-                right_size = (init_gap[3] - init_gap[2])
+                left_size = (init_gaps[1] - init_gaps[0])
+                right_size = (init_gaps[3] - init_gaps[2])
 
-                point1 = init_gap[1] + left_size
-                point2 = init_gap[2] - right_size
+                point1 = init_gaps[1] + left_size
+                point2 = init_gaps[2] - right_size
 
                 gaps = np.array([point1, point2])
-
             else:
-                tooth_step = (init_gap[2] - init_gap[1]) / 4
-                gaps = np.array([init_gap[1] + tooth_step * i for i in range(1, 4)])
+                tooth_step = (init_gaps[2] - init_gaps[1]) / 4
+                gaps = np.array([init_gaps[1] + tooth_step * i for i in range(1, 4)])
 
             # Transform back to global
+            target_roi['zooming_gaps'] = np.concatenate((init_gaps, gaps), axis=0)
+
             gaps_global = gaps.copy()
             gaps_global += [0, offset]
             gaps_global = rotate_point(target_roi['angle'], target_roi['image'].shape, gaps_global, recovery=True)
@@ -235,9 +234,10 @@ class ImageEdge:
 
             self.template_points[flag] = np.concatenate((self.template_points[flag], gaps_global), axis=0)
 
-            plt.imshow(1 - target_roi['image_zooming'])
-            for i in init_gap:
-                plt.scatter(*i)
-            for i in gaps:
-                plt.scatter(*i, color='green')
-            plt.show()
+            # Plot
+            # plt.imshow(1 - target_roi['image_zooming'])
+            # for i in init_gaps:
+            #     plt.scatter(*i)
+            # for i in gaps:
+            #     plt.scatter(*i, color='green')
+            # plt.show()
