@@ -9,3 +9,15 @@ test
 
 dist
 build
+
+*.pyc
+events.out.*
+
+*.csv
+*.spec
+*.bak
+*.gz
+
+*batch*
+
+
