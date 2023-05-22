@@ -341,9 +341,9 @@ def gum_jaw_separation(source, flag='upper', margin=30, padding=200):
             gum_sep_line = jaw_sep_line - 130
         else:
             # before change
-            # gum_sep_line = gum_sep_line_pool[-1]
+            gum_sep_line = gum_sep_line_pool[-1]
             # after change
-            gum_sep_line = gum_sep_line_pool.min()
+            # gum_sep_line = gum_sep_line_pool.min()
 
         gum_sep_line -= margin
 
