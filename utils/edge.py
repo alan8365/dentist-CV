@@ -1,20 +1,24 @@
 from pathlib import Path
 
 import cv2 as cv
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
-import matplotlib.pyplot as plt
 import torchvision.transforms as transforms
-import numpy as np
-
 from PIL import Image, ImageOps
 from scipy import ndimage
+from scipy import special
+from scipy.ndimage import rotate
 from scipy.signal import find_peaks
+from skimage import color
+from skimage.segmentation import mark_boundaries, slic
+from skimage.util import img_as_float
+from yolov5.utils.plots import Annotator
 
-from yolov5.utils.plots import Annotator, save_one_box
+from utils.general import integral_intensity_projection
 from utils.preprocess import recovery_rotated_bounding
 from utils.yolo import get_teeth_ROI, crop_by_xyxy
-from utils.general import integral_intensity_projection
 
 all_tooth_number_dict = {
     'upper': {
@@ -31,6 +35,14 @@ all_tooth_number_dict = {
 
 
 def consecutive(data, step_size=1):
+    """
+    This function takes a list of numbers and splits it into sub-arrays of consecutive numbers.
+    Args:
+        data: A 1-D array of numerical data
+        step_size: The size of the step between consecutive elements in the array (default is 1)
+
+    Returns: An array of sub-arrays, each containing consecutive elements from the original array
+    """
     return np.split(data, np.where(np.diff(data) != step_size)[0] + 1)
 
 
@@ -160,6 +172,13 @@ def window_avg(source, window_size=5):
 
 
 def get_slope(source):
+    """
+    Args:
+        source: The source array to get the slope from
+
+    Returns:
+        An array of the same size as the input containing the slope of the source array at each index
+    """
     x = np.array(range(source.shape[0]))
 
     result = np.gradient(source, x)
@@ -294,13 +313,12 @@ def get_valley_window(source, window_size_0=50, left_margin_0=50):
     return window_position, window_size, valleys
 
 
-def gum_jaw_separation(source, flag='upper'):
-    margin = 30
-    padding = 150
-    if flag == 'upper':
+def gum_jaw_separation(source, flag='upper', margin=30, padding=200):
+    if flag == 'lower':
         source = np.flip(source, axis=0)
 
-    source = source[:-padding, :]
+    source = source[padding:, :]
+    source = cv.equalizeHist(source)
 
     hor, _ = integral_intensity_projection(source)
     hor = window_avg(hor)
@@ -309,29 +327,36 @@ def gum_jaw_separation(source, flag='upper'):
 
     height, width = source.shape
 
-    jaw_sep_line = 0
-    gum_sep_line = height
+    jaw_sep_line = height
+    gum_sep_line = 0
     default_return = [gum_sep_line, jaw_sep_line, hor_valleys, hor]
 
-    hor_valleys = hor_valleys[hor_valleys < height - padding // 2]
+    # 假如沒有任何波谷則不放大
     if hor_valleys.size > 0:
         jaw_sep_line = hor_valleys[hor[hor_valleys].argmin()]
 
-        gum_sep_line_pool = hor_valleys[hor_valleys > jaw_sep_line + 30]
+        gum_sep_line_pool = hor_valleys[hor_valleys < jaw_sep_line - 30]
         if gum_sep_line_pool.size == 0:
-            gum_sep_line = jaw_sep_line + 100 + margin
+            # 根據經驗推估一個可能的位置
+            gum_sep_line = jaw_sep_line - 130
         else:
-            gum_sep_line = hor_valleys[hor_valleys > jaw_sep_line + 30][0]
+            # before change
+            gum_sep_line = gum_sep_line_pool[-1]
+            # after change
+            # gum_sep_line = gum_sep_line_pool.min()
 
-        gum_sep_line += margin
+        gum_sep_line -= margin
 
-        if jaw_sep_line < height // 2:
-            default_return[0] = gum_sep_line
-            default_return[1] = jaw_sep_line
+    if jaw_sep_line > height // 3:
+        default_return[0] = gum_sep_line
+        default_return[1] = jaw_sep_line
 
-    if flag == 'upper':
-        default_return[0] = height - default_return[0] + padding
-        default_return[1] = height - default_return[1] + padding
+    if flag == 'lower':
+        default_return[0] = height - default_return[0]
+        default_return[1] = height - default_return[1]
+    else:
+        default_return[0] = default_return[0] + padding
+        default_return[1] = default_return[1] + padding
 
     return default_return
 
@@ -575,6 +600,7 @@ def bounding_teeth_on_origin(results, save=False, rotation_fix=False):
             number = datum['number']
             im = datum['image']
             offset = datum['offset']
+            tooth_position = datum['tooth_position']
 
             tooth_position = tooth_position_dict[number]
             im_g = cv.cvtColor(im, cv.COLOR_RGB2GRAY)
@@ -615,63 +641,50 @@ def bounding_teeth_on_origin(results, save=False, rotation_fix=False):
     return teeth_region
 
 
-# Testing help function
-def quick_get_roi(image_name, model=None, roi_index=0):
-    tooth_position_dict = {
-        0: 'left',
-        1: 'middle',
-        2: 'right'
+def super_pixel(im_g, num_segments=30):
+    im_float = img_as_float(im_g)
 
-    }
-    filename = image_name.stem
+    labels = slic(im_float, n_segments=num_segments, compactness=0.3, sigma=5)
 
-    results = model(image_name)
-    teeth_roi = get_teeth_ROI(results)
-    teeth_roi_images = teeth_roi['images'][filename]
-    teeth_roi_split_teeth = teeth_roi['split_teeth']
+    fig = plt.figure("Superpixels -- %d segments" % num_segments)
+    ax = fig.add_subplot(1, 1, 1)
+    ax.imshow(mark_boundaries(1 - im_float, labels))
+    plt.axis("off")
 
-    target_roi = teeth_roi_images[roi_index]
-    target_roi_image = target_roi['image']
-    flag = target_roi['flag']
-    tooth_position = tooth_position_dict[target_roi['number']]
-    im_g = cv.cvtColor(target_roi_image, cv.COLOR_RGBA2GRAY)
-    im_g_shape = np.array(np.array(im_g.shape)[[1, 0]])
+    out = color.label2rgb(labels, im_float, kind='avg', bg_label=0)[:, :, 0]
 
-    return im_g, flag, tooth_position
+    return out
 
 
-def quick_rotate_and_zooming(source, flag, tooth_position):
-    theta = get_rotation_angle(source, flag=flag, tooth_position=tooth_position)
-    source_rotated = ndimage.rotate(source, theta, reshape=True, cval=255)
+def fill_rotate(im, im_roi_xyxy, theta, expand_size=None):
+    h_0, w_0 = im_roi_xyxy[3] - im_roi_xyxy[1], im_roi_xyxy[2] - im_roi_xyxy[0]
 
-    gum_sep_line, jaw_sep_line, hor_valleys, hor = gum_jaw_separation(source_rotated, flag=flag)
+    s, c = special.sindg(abs(theta)), special.cosdg(theta)
 
-    height, width = source.shape
-    phi = np.radians(abs(theta))
-    opposite = np.sin(phi) * width
-    adjacent = np.cos(phi) * height
+    x_expand, y_expand = int(s * c * h_0), int(s * c * w_0)
+    if expand_size:
+        x_expand += expand_size[0]
+        y_expand += expand_size[1]
+    im_roi_xyxy_expand = im_roi_xyxy + np.array([-x_expand, -y_expand, x_expand, y_expand])
+    x1, y1, x2, y2 = im_roi_xyxy_expand
+    im_roi_expand = im[y1:y2, x1:x2]
+    if theta == 0:
+        return im_roi_expand
 
-    if flag == 'upper':
-        source_roi = source_rotated[gum_sep_line:jaw_sep_line, :]
-        y1 = gum_sep_line
-        y2 = jaw_sep_line
-    elif flag == 'lower':
-        source_roi = source_rotated[jaw_sep_line:gum_sep_line, :]
-        y1 = jaw_sep_line
-        y2 = gum_sep_line
-    else:
-        raise ValueError(f'flag only accept upper or lower but get {flag}.')
+    r_e = rotate(im_roi_expand, theta)
 
-    left_padding, right_padding = 0, 1
-    if theta > 0:
-        left_padding = round((y2 - opposite) * np.tan(phi))
-        right_padding = round((adjacent - y1) * np.tan(phi))
-    elif theta < 0:
-        left_padding = round((adjacent - y1) * np.tan(phi))
-        right_padding = round((y2 - opposite) * np.tan(phi))
-    source_roi = source_roi[:, left_padding:-right_padding]
+    h, w = int(h_0 * c + w_0 * s), int(h_0 * s + w_0 * c)
+    h_e, w_e = r_e.shape
 
-    return source_roi
+    w_padding = (w_e - w) // 2
+    h_padding = (h_e - h) // 2
+    if expand_size:
+        w_padding -= expand_size[0]
+        h_padding -= expand_size[1]
+
+    r_e = r_e[h_padding:-h_padding, w_padding:-w_padding]
+
+    return r_e
 
 
 if __name__ == '__main__':

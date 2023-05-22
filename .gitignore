@@ -21,3 +21,5 @@ events.out.*
 *batch*
 
 
+.DS_Store
+*/__pycache__

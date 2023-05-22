@@ -3,12 +3,12 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
-from torch.utils.data.dataset import Dataset, T_co
 from sklearn.preprocessing import MultiLabelBinarizer
+from torch.utils.data.dataset import Dataset, T_co
 
 
 class ToothCropClassDataset(Dataset):
-    def __init__(self, root, transform=None, target_transform=None, non_label_include=False, train=True):
+    def __init__(self, root, transform=None, target_transform=None, non_label_include=False, train=True, yolov8=True):
         root = Path(root)
 
         self.transform = transform
@@ -20,7 +20,10 @@ class ToothCropClassDataset(Dataset):
         self.mlb = MultiLabelBinarizer()
         img_names = list(self.annotations.keys())
 
-        self.imgs = np.array([root / 'crops' / i.split(' ')[0] / f'{i}.jpg' for i in img_names])
+        if yolov8:
+            self.imgs = np.array([root / f'{i}.jpg' for i in img_names])
+        else:
+            self.imgs = np.array([root / 'crops' / i.split(' ')[0] / f'{i}.jpg' for i in img_names])
 
         self.labels = [self.annotations[i] for i in img_names]
         self.labels = self.mlb.fit_transform(self.labels)
