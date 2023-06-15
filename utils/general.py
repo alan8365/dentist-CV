@@ -60,5 +60,3 @@ def intersection(p1, p2, p3, p4):
     px = (a * (x3 - x4) - (x1 - x2) * b) / c
     py = (a * (y3 - y4) - (y1 - y2) * b) / c
     return px, py
-
-

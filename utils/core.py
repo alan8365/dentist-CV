@@ -1,37 +1,43 @@
-# %%
-import cv2
-import matplotlib
-import matplotlib.pyplot as plt
+import os
+import warnings
+from pathlib import Path
+
+import numpy as np
 import timm
 import torch
-import numpy as np
-
-from PIL import Image
-from pathlib import Path
-from dotenv import load_dotenv
-from timm.data.loader import create_loader
-from timm.data.dataset import ImageDataset
 import torchvision.transforms as transforms
+from PIL import Image
+from dotenv import load_dotenv
+from timm.data.dataset import ImageDataset
+from timm.data.loader import create_loader
 
-import os
-
-from ViT.tooth_crop_dataset import ToothCropClassDataset
-from utils.preprocess import rect_include_another, rotate_bounding_boxes, xyxy_reformat, xyxy2xywh
+from utils.edge import get_all_teeth
+from utils.preprocess import rect_include_another, rotate_bounding_boxes, xyxy2xywh
 from utils.yolo import get_teeth_ROI
-from utils.edge import tooth_isolation, bounding_teeth_on_origin, get_all_teeth
-
-import warnings
 
 warnings.filterwarnings("ignore")
 
 
 def main(image_names, iou_threshold=0.5):
+    """
+    Args:
+        image_names: A list of image names
+        iou_threshold: A threshold for IoU (default is 0.5)
+    Returns:
+        {
+            filename: {
+                tooth_number: set(anomalies...)
+            }
+        }
+    """
     load_dotenv()
     YOLO_model_dir = Path(os.getenv('YOLO_MODEL_DIR'))
 
-    tooth_detect_model = torch.hub.load(str((YOLO_model_dir / '..').resolve()), 'custom', path=YOLO_model_dir / '8-bound.pt', source='local',
+    tooth_detect_model = torch.hub.load(str((YOLO_model_dir / '..').resolve()), 'custom',
+                                        path=YOLO_model_dir / '8-bound.pt', source='local',
                                         verbose=False)
-    anomaly_detect_model = torch.hub.load(str((YOLO_model_dir / '..').resolve()), 'custom', path=YOLO_model_dir / 'anomaly.pt', source='local')
+    anomaly_detect_model = torch.hub.load(str((YOLO_model_dir / '..').resolve()), 'custom',
+                                          path=YOLO_model_dir / 'anomaly.pt', source='local')
 
     # data_dir = Path(dir)
     # image_names = list(data_dir.glob('*.jpg'))

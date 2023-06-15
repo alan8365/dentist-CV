@@ -154,23 +154,6 @@ def window_avg(source, window_size=5):
     return result
 
 
-# def get_slope(source, window_size=5):
-#     result = np.zeros(source.shape, dtype='int32')
-#     step = window_size // 2
-#     length = len(source)
-#
-#     for i in range(length):
-#         if i < step:
-#             pass
-#         elif i > length - step - 1:
-#             pass
-#         else:
-#             slope = (source[i + step] - source[i - step]) / window_size
-#             result[i] = slope
-#
-#     return result
-
-
 def get_slope(source):
     """
     Args:
@@ -580,8 +563,8 @@ def get_all_teeth(results):
     return teeth_region
 
 
-def bounding_teeth_on_origin(results, save=False, rotation_fix=False):
-    teeth_roi = get_teeth_ROI(results)
+def bounding_teeth_on_origin(results, save=False, rotation_fix=False, yolov8=False):
+    teeth_roi = get_teeth_ROI(results, yolov8=yolov8)
 
     split_teeth = teeth_roi['split_teeth']
     teeth_roi = teeth_roi['images']
@@ -597,12 +580,10 @@ def bounding_teeth_on_origin(results, save=False, rotation_fix=False):
         temp_region = {}
         for datum in data:
             flag = datum['flag']
-            number = datum['number']
             im = datum['image']
             offset = datum['offset']
             tooth_position = datum['tooth_position']
 
-            tooth_position = tooth_position_dict[number]
             im_g = cv.cvtColor(im, cv.COLOR_RGB2GRAY)
 
             isolation_data = tooth_isolation(im_g, flag=flag, filename=file_name, tooth_position=tooth_position,

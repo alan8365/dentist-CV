@@ -5,7 +5,6 @@ import numpy as np
 import torch
 from PIL import Image
 from yolov5.utils.general import increment_path
-from yolov5.utils.plots import save_one_box
 
 
 def test_curve_factory(middle_width, middle_height, a=-0.0004):
@@ -37,7 +36,7 @@ def crop_by_two_tooth(left_tooth, right_tooth, margin=50, padding=50):
     return crop
 
 
-def get_teeth_ROI(detected_results, save=False):
+def get_teeth_ROI(detected_results, save=False, yolov8=False):
     flag_dict = {
         'upper': [
             '17', '13', '23', '27'
@@ -56,9 +55,17 @@ def get_teeth_ROI(detected_results, save=False):
     images = {}
     split_teeth = {}
     for i in range(len(detected_results)):
-        file_name = detected_results.files[i][:-4]
-        bounds = detected_results.xyxy[i]
-        img = detected_results.imgs[i]
+        if yolov8:
+            detected_result = detected_results[i]
+            file_name = Path(detected_result.path).stem
+            bounds = detected_result.boxes.data
+            img = detected_result.orig_img
+            names = detected_result.names
+        else:
+            file_name = detected_results.files[i][:-4]
+            bounds = detected_results.xyxy[i]
+            img = detected_results.imgs[i]
+            names = detected_results.names
 
         images[file_name] = []
         split_teeth[file_name] = {}
@@ -74,7 +81,7 @@ def get_teeth_ROI(detected_results, save=False):
             xyxy = torch.vstack([x1, y1, x2, y2])
 
             cls = int(cls.item())
-            name = detected_results.names[cls]
+            name = names[cls]
             tooth_bounds.append({'xyxy': xyxy, 'name': name})
 
         teeth_dict = {}
