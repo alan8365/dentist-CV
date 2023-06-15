@@ -10,5 +10,16 @@ test
 dist
 build
 
+*.pyc
+events.out.*
+
+*.csv
+*.spec
+*.bak
+*.gz
+
+*batch*
+
+
 .DS_Store
 */__pycache__
