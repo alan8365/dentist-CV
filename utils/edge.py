@@ -569,12 +569,6 @@ def bounding_teeth_on_origin(results, save=False, rotation_fix=False, yolov8=Fal
     split_teeth = teeth_roi['split_teeth']
     teeth_roi = teeth_roi['images']
 
-    tooth_position_dict = {
-        0: 'left',
-        1: 'middle',
-        2: 'right'
-    }
-
     teeth_region = {}
     for file_name, data in teeth_roi.items():
         temp_region = {}
