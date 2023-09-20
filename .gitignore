@@ -23,3 +23,5 @@ events.out.*
 
 .DS_Store
 */__pycache__
+
+*/dentex-sample
