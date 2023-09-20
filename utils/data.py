@@ -101,10 +101,9 @@ class DentexDataset:
     def yolo_yaml_gen(self, path=None):
         if not path:
             path = self.task_root_dir / 'yolov8'
-        yaml_path = path / 'dentex.yaml'
 
-        image_path = path / 'image'
-        label_path = path / 'label'
+        image_path = path / 'images'
+        label_path = path / 'labels'
 
         train_image = image_path / 'train'
         val_image = image_path / 'val'
@@ -119,13 +118,12 @@ class DentexDataset:
 
         yaml_file = f'''
 path: {path}
-train: {train_image}
-val: {val_image}
+train: {train_image.relative_to(path)}
+val: {val_image.relative_to(path)}
 
 names:
   {names_str}
         '''
-
 
         def make_dirs(dirs):
             for i in dirs:
@@ -138,7 +136,7 @@ names:
         make_dirs(yolov8_dirs)
 
         # YAML file gen
-        with open(yaml_path, 'w') as f:
+        with open(path / 'dentex.yaml', 'w') as f:
             f.write(yaml_file)
 
         # Write image and label data
@@ -150,7 +148,7 @@ names:
         for anno_dst, image_dst, label_dst in dst_triple:
             self.yolo_write_image_label_data(anno_dst, image_dst, label_dst, inv_names)
 
-        return yaml_path
+        return path / 'dentex.yaml'
 
     def yolo_write_image_label_data(self, anno_dst, image_dst, label_dst, inv_names):
         """Processes annotation and image data for tooth segmentation.
