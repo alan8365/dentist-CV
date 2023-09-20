@@ -18,11 +18,12 @@ class DentexDataset:
         train: Whether to load the training or validation set.
         task: The task to perform on the dataset.
         sample: Whether to sample the dataset.
+        ours:
 
     Raises: ValueError: If the `task` argument is not one of `quadrant`, `quadrant_enumeration`,
     or `quadrant_enumeration_disease`.
     """
-    def __init__(self, root_dir: Path, train=True, task='quadrant_enumeration', sample=False):
+    def __init__(self, root_dir: Path, train=True, task='quadrant_enumeration', sample=False, ours=False):
         self.root_dir = root_dir
         self.train = train
         self.task = task
@@ -60,6 +61,9 @@ class DentexDataset:
 
         if sample:
             annotations = annotations.sample(frac=0.275)
+        if ours:
+            target_list = [''.join(i) for i in zip('11223344', '37' * 4)]
+            annotations = annotations[target_list]
 
         self.annotations = annotations.sort_index()
 
