@@ -3,7 +3,7 @@ ipython==7.19.0
 python-dotenv==0.20.0
 matplotlib==3.5.2
 numpy==1.22.3
-opencv-python==4.6.0.66
+opencv-python==4.8.0.76
 pandas==1.4.3
 pip==22.2.2
 protobuf==3.19.4
