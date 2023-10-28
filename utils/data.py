@@ -84,6 +84,9 @@ class DentexDataset:
 
         return im, anno
 
+    def __len__(self):
+        return len(self.annotations)
+
     def image_full_path(self, image_name):
         return self.task_root_dir / 'xrays' / image_name
 
